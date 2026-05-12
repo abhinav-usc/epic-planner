@@ -11,6 +11,12 @@ import type {
 } from "../types";
 import { api } from "../api/client";
 
+/** Median wait + worst-case wait per attraction for the current target date. */
+export interface AttractionDaySummary {
+  median_wait: number;
+  worst_case_median: number;
+}
+
 interface PlannerState {
   // Catalog
   lands: Record<LandId, Land> | null;
@@ -22,10 +28,15 @@ interface PlannerState {
   // Settings
   targetDate: string;        // YYYY-MM-DD
   earlyEntry: boolean;
+  worstCaseMode: boolean;    // when true, timeline uses worst-case wait for height
   apiKey: string;
 
   // Crowd forecast for current date
   forecast: CrowdForecast | null;
+
+  // Per-attraction summary for the current date (used by left-rail wait pills
+  // and the timeline when worstCaseMode is on)
+  daySummaries: Record<string, AttractionDaySummary>;
 
   // Manual itinerary
   plannedItems: PlannedItem[];
@@ -39,8 +50,9 @@ interface PlannerState {
   loadCatalog: () => Promise<void>;
   setDate: (d: string) => Promise<void>;
   setEarlyEntry: (v: boolean) => void;
+  setWorstCaseMode: (v: boolean) => void;
   setApiKey: (k: string) => void;
-  addPlannedItem: (a: Attraction, startMinute: number, waitMinutes: number) => void;
+  addPlannedItem: (a: Attraction, startMinute: number, waitMinutes: number, worstCaseWait?: number) => void;
   movePlannedItem: (id: string, startMinute: number) => void;
   removePlannedItem: (id: string) => void;
   togglePriority: (attractionId: string) => void;
@@ -48,6 +60,7 @@ interface PlannerState {
   setRank: (attractionId: string, rank: number) => void;
   runOptimize: () => Promise<void>;
   applyOptimizeResultToTimeline: () => void;
+  refreshDaySummaries: () => Promise<void>;
 }
 
 const todaysDefault = "2026-05-25";  // Memorial Day Monday
@@ -61,9 +74,11 @@ export const usePlanner = create<PlannerState>((set, get) => ({
 
   targetDate: todaysDefault,
   earlyEntry: false,
+  worstCaseMode: false,
   apiKey: typeof window !== "undefined" ? localStorage.getItem("anthropic_api_key") || "" : "",
 
   forecast: null,
+  daySummaries: {},
   plannedItems: [],
   priorities: [],
   optimizing: false,
@@ -78,6 +93,8 @@ export const usePlanner = create<PlannerState>((set, get) => ({
         api.crowdForecast(get().targetDate),
       ]);
       set({ lands, attractions, restaurants, forecast, loaded: true, catalogError: null });
+      // kick off summary refresh in the background
+      get().refreshDaySummaries();
     } catch (e: any) {
       set({ catalogError: e.message ?? String(e), loaded: false });
     }
@@ -89,22 +106,28 @@ export const usePlanner = create<PlannerState>((set, get) => ({
       const forecast = await api.crowdForecast(d);
       set({ forecast });
     } catch {/* ignore */}
+    get().refreshDaySummaries();
   },
 
   setEarlyEntry: (v) => set({ earlyEntry: v }),
+  setWorstCaseMode: (v) => set({ worstCaseMode: v }),
 
   setApiKey: (k) => {
     if (typeof window !== "undefined") localStorage.setItem("anthropic_api_key", k);
     set({ apiKey: k });
   },
 
-  addPlannedItem: (a, startMinute, waitMinutes) => {
+  addPlannedItem: (a, startMinute, waitMinutes, worstCaseWait) => {
     const id = `${a.id}-${Date.now()}`;
-    const duration = waitMinutes + a.duration_minutes;
+    const wait = Math.max(0, Math.round(waitMinutes || 0));
+    const duration = wait + a.duration_minutes;
     set(s => ({
       plannedItems: [...s.plannedItems, {
         id, attraction_id: a.id, name: a.name, land: a.land,
-        start_minute: startMinute, duration_minute: duration, wait_minutes: waitMinutes,
+        start_minute: Math.max(0, Math.round(startMinute)),
+        duration_minute: duration,
+        wait_minutes: wait,
+        worst_case_wait: worstCaseWait != null ? Math.round(worstCaseWait) : undefined,
       }],
     }));
   },
@@ -160,6 +183,38 @@ export const usePlanner = create<PlannerState>((set, get) => ({
       set({ optimizing: false, optimizeResult: null });
       alert(`Optimization failed: ${e.message ?? e}`);
     }
+  },
+
+  refreshDaySummaries: async () => {
+    // Pull the day-curve for every ride/experience in parallel; cache the
+    // median predicted wait and the median worst-case so the left-rail can
+    // show a representative pill per attraction.
+    const { attractions, targetDate, earlyEntry } = get();
+    if (!attractions.length) return;
+    const targets = attractions.filter(a => a.kind === "ride" || a.kind === "experience");
+    const summaries: Record<string, AttractionDaySummary> = {};
+    await Promise.all(
+      targets.map(async a => {
+        try {
+          const curve = await api.dayCurve(a.id, targetDate, earlyEntry);
+          const waits = curve.hours.map(h => h.wait_minutes).filter(n => Number.isFinite(n));
+          const worst = curve.hours
+            .map(h => h.worst_case_wait)
+            .filter((n): n is number => n != null);
+          const median = (arr: number[]) => {
+            if (!arr.length) return 0;
+            const s = [...arr].sort((x, y) => x - y);
+            const m = Math.floor(s.length / 2);
+            return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
+          };
+          summaries[a.id] = {
+            median_wait: median(waits),
+            worst_case_median: median(worst),
+          };
+        } catch {/* skip */}
+      }),
+    );
+    set({ daySummaries: summaries });
   },
 
   applyOptimizeResultToTimeline: () => {

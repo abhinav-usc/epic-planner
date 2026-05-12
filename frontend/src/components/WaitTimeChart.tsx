@@ -28,9 +28,9 @@ export function WaitTimeChart({ attraction }: { attraction: Attraction }) {
     <div className="panel p-4">
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="min-w-0">
-          <div className="text-xs uppercase tracking-wider text-ink-muted">{attraction.kind}</div>
-          <h3 className="font-display font-bold text-lg leading-tight">{attraction.name}</h3>
-          <p className="text-xs text-ink-secondary mt-0.5">{attraction.description}</p>
+          <div className="section-label capitalize">{attraction.kind}</div>
+          <h3 className="text-base font-medium leading-tight mt-1">{attraction.name}</h3>
+          <p className="text-[11px] text-ink-secondary mt-0.5 leading-relaxed">{attraction.description}</p>
         </div>
       </div>
 
@@ -38,26 +38,26 @@ export function WaitTimeChart({ attraction }: { attraction: Attraction }) {
 
       {curve && !loading && (
         <>
-          <div className="grid grid-cols-4 gap-2 text-center mb-3 text-xs">
-            <div className="card px-2 py-1.5">
-              <div className="text-ink-secondary">Best</div>
-              <div className="font-semibold text-green-400">
+          <div className="grid grid-cols-4 gap-2 text-center mb-3 text-[11px]">
+            <div className="card px-2 py-1">
+              <div className="text-ink-secondary text-[9px]">Best</div>
+              <div className="font-medium text-emerald-300">
                 {bestHour && bestHour.hour}:00 · {minWait}m
               </div>
             </div>
-            <div className="card px-2 py-1.5">
-              <div className="text-ink-secondary">Peak</div>
-              <div className="font-semibold text-amber-400">{maxWait}m</div>
+            <div className="card px-2 py-1">
+              <div className="text-ink-secondary text-[9px]">Peak</div>
+              <div className="font-medium text-amber-300">{maxWait}m</div>
             </div>
-            <div className="card px-2 py-1.5" title="Historical 90th-percentile worst case">
-              <div className="text-ink-secondary">Worst</div>
-              <div className="font-semibold text-red-400">
+            <div className="card px-2 py-1" title="Historical 90th-percentile worst case">
+              <div className="text-ink-secondary text-[9px]">Worst</div>
+              <div className="font-medium text-red-300">
                 {hasWorstCase ? `${maxWorstCase}m` : "—"}
               </div>
             </div>
-            <div className="card px-2 py-1.5">
-              <div className="text-ink-secondary">Ride</div>
-              <div className="font-semibold">{attraction.duration_minutes}m</div>
+            <div className="card px-2 py-1">
+              <div className="text-ink-secondary text-[9px]">Ride</div>
+              <div className="font-medium">{attraction.duration_minutes}m</div>
             </div>
           </div>
 
@@ -97,28 +97,26 @@ export function WaitTimeChart({ attraction }: { attraction: Attraction }) {
             </ResponsiveContainer>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+          <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
             <button
               onClick={() => {
                 if (!bestHour) return;
                 const openHour = earlyEntry ? 8 : 9;
                 const startMin = (bestHour.hour - openHour) * 60;
-                addPlannedItem(attraction, startMin, bestHour.wait_minutes);
+                addPlannedItem(attraction, startMin, bestHour.wait_minutes, bestHour.worst_case_wait ?? undefined);
               }}
               className="btn-primary"
             >
-              + Add at best time ({bestHour?.hour}:00)
+              Add at best time ({bestHour?.hour}:00)
             </button>
             <button
               onClick={() => {
-                // add at first hour
-                const openHour = earlyEntry ? 8 : 9;
                 const first = curve.hours[0];
-                addPlannedItem(attraction, 0, first.wait_minutes);
+                addPlannedItem(attraction, 0, first.wait_minutes, first.worst_case_wait ?? undefined);
               }}
               className="btn-ghost"
             >
-              + Add at rope drop
+              Add at rope drop
             </button>
           </div>
         </>

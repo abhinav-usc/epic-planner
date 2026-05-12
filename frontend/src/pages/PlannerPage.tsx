@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SettingsBar } from "../components/SettingsBar";
 import { LandSidebar } from "../components/LandSidebar";
-import { Timeline, TIMELINE_PX_PER_MIN } from "../components/Timeline";
-// TIMELINE_PX_PER_MIN imported above is used by the drag-to-move logic below.
+import { Timeline } from "../components/Timeline";
 import { OptimizePanel } from "../components/OptimizePanel";
 import { WaitTimeChart } from "../components/WaitTimeChart";
 import { AIChat } from "../components/AIChat";
@@ -12,13 +11,17 @@ import { api } from "../api/client";
 import type { Attraction } from "../types";
 
 export function PlannerPage() {
-  const { loaded, catalogError, loadCatalog, addPlannedItem, movePlannedItem, targetDate, earlyEntry, plannedItems } = usePlanner();
+  const {
+    loaded, catalogError, loadCatalog,
+    addPlannedItem, movePlannedItem, plannedItems,
+    targetDate, earlyEntry,
+  } = usePlanner();
   const [selected, setSelected] = useState<Attraction | null>(null);
   const [refreshNote, setRefreshNote] = useState<string | null>(null);
 
   useEffect(() => { loadCatalog(); }, [loadCatalog]);
 
-  // On mount: check data freshness; if stale, kick off a background refresh.
+  // Data freshness check on mount
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -28,16 +31,11 @@ export function PlannerPage() {
         if (f.refresh_running) {
           setRefreshNote("Updating wait-time data…");
         } else if (f.needs_refresh) {
-          setRefreshNote(
-            `Wait-time data is ${f.epic_age_days ?? "?"} days old. Refreshing…`
-          );
+          setRefreshNote(`Wait-time data is ${f.epic_age_days ?? "?"} days old. Refreshing…`);
           await api.dataRefresh();
         }
-        // poll-clear: when refresh ends we just stop showing the banner
         setTimeout(() => alive && setRefreshNote(null), 5000);
-      } catch {
-        // backend unreachable; PlannerPage already shows the error elsewhere
-      }
+      } catch {/* ignore */}
     })();
     return () => { alive = false; };
   }, []);
@@ -45,32 +43,41 @@ export function PlannerPage() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   async function onDragEnd(e: DragEndEvent) {
-    const id = String(e.active.id);
-    const overId = e.over?.id;
+    const activeId = String(e.active.id);
+    const over = e.over;
+    if (!over) return;
+    const overId = String(over.id);
 
-    // Drag an attraction card → drop on timeline = add at predicted best hour
-    if (id.startsWith("attr-") && overId === "timeline") {
+    // Drop must land on one of the per-hour droppables.
+    if (!overId.startsWith("timeline-hour-")) {
+      // If we're repositioning, allow drop on the same hour the bar sits over
+      // (e.over has bubbled from a child); otherwise cancel cleanly.
+      return;
+    }
+    const targetHour = Number(overId.slice("timeline-hour-".length));
+    const openHour = earlyEntry ? 8 : 9;
+    const startMin = Math.max(0, (targetHour - openHour) * 60);
+
+    // Case 1: dragging an attraction from the sidebar → add a new block
+    if (activeId.startsWith("attr-")) {
       const a = e.active.data.current?.attraction as Attraction | undefined;
       if (!a) return;
       try {
         const curve = await api.dayCurve(a.id, targetDate, earlyEntry);
-        const openHour = earlyEntry ? 8 : 9;
-        // Pick the lowest-wait hour as the default landing slot.
-        const best = curve.hours.reduce((acc, h) => h.wait_minutes < acc.wait_minutes ? h : acc, curve.hours[0]);
-        addPlannedItem(a, (best.hour - openHour) * 60, best.wait_minutes);
+        const h = curve.hours.find(x => x.hour === targetHour) || curve.hours[0];
+        addPlannedItem(a, startMin, h.wait_minutes, h.worst_case_wait ?? undefined);
       } catch {
-        addPlannedItem(a, 0, 30);
+        addPlannedItem(a, startMin, 30);
       }
       return;
     }
 
-    // Drag an existing bar to reposition
-    if (id.startsWith("plan-")) {
-      const planId = id.slice("plan-".length);
+    // Case 2: repositioning an existing block → snap start to the target hour
+    if (activeId.startsWith("plan-")) {
+      const planId = activeId.slice("plan-".length);
       const existing = plannedItems.find(p => p.id === planId);
       if (!existing) return;
-      const deltaMin = Math.round((e.delta.y) / TIMELINE_PX_PER_MIN);
-      movePlannedItem(planId, existing.start_minute + deltaMin);
+      movePlannedItem(planId, startMin);
       return;
     }
   }
@@ -78,8 +85,8 @@ export function PlannerPage() {
   if (catalogError) {
     return (
       <div className="h-full flex items-center justify-center p-8">
-        <div className="panel p-6 max-w-md text-sm">
-          <h2 className="font-display font-bold text-lg mb-2">Backend not reachable</h2>
+        <div className="panel p-5 max-w-md text-sm">
+          <h2 className="font-medium text-base mb-2">Backend not reachable</h2>
           <div className="text-ink-secondary mb-3">
             The FastAPI server didn't respond. Start it with:
           </div>
@@ -103,7 +110,7 @@ export function PlannerPage() {
       <div className="h-screen flex flex-col">
         <SettingsBar />
         {refreshNote && (
-          <div className="px-4 py-1 text-xs bg-bg-card text-ink-secondary border-b border-bg-hover">
+          <div className="px-4 py-1 text-[10px] bg-bg-card text-ink-secondary border-b border-bg-hover">
             ↻ {refreshNote}
           </div>
         )}

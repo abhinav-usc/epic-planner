@@ -102,4 +102,5 @@ export interface PlannedItem {
   start_minute: number;  // minutes since park open (0 = 8 AM or 9 AM)
   duration_minute: number;
   wait_minutes: number;
+  worst_case_wait?: number;  // historical 90th-percentile wait
 }
