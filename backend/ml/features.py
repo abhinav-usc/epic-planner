@@ -1,13 +1,22 @@
-"""Feature engineering for the wait time model."""
+"""Feature engineering for the wait time model.
+
+Two feature sets:
+- `PARK_FEATURE_NAMES` / `build_park_feature_row()`:
+    Calendar + holiday features used to predict park-wide rolling-average
+    wait. Trained on 10 years of Disney + Universal park data.
+
+- `RIDE_FEATURE_NAMES` / `build_ride_feature_row()`:
+    Park features + ride attributes + `park_avg_pred` (predicted by the
+    park model) — used to predict per-ride wait. Trained on Epic Universe
+    historical per-ride data.
+"""
 from __future__ import annotations
 
 from datetime import date, datetime
 from typing import Optional
 
-from backend.data.attractions_db import Attraction, attraction_by_id
+from backend.data.attractions_db import Attraction
 from backend.ml.crowd_factors import (
-    DOW_MULTIPLIER,
-    MONTH_MULTIPLIER,
     forecast_for,
     holiday_factor,
     hourly_factor,
@@ -15,7 +24,9 @@ from backend.ml.crowd_factors import (
 )
 
 
-FEATURE_NAMES: list[str] = [
+# Park-level features: calendar / holiday only. No ride-specific or park-id
+# features — we want this model to learn a single "average mature park" pattern.
+PARK_FEATURE_NAMES: list[str] = [
     "hour",
     "minute_bucket",
     "day_of_week",
@@ -25,29 +36,14 @@ FEATURE_NAMES: list[str] = [
     "holiday_mult",
     "crowd_base_mult",
     "hour_mult",
-    "novelty_mult",
-    "ride_tier",
-    "capacity_per_hour",
-    "is_first_hour_open",
-    "is_last_hour_open",
-    "has_express",
-    "has_single_rider",
-    "early_entry",
 ]
 
 
-def build_feature_row(
-    a: Attraction,
-    when: datetime,
-    early_entry: bool = False,
-) -> dict:
+def build_park_feature_row(when: datetime) -> dict:
+    """Calendar/holiday features for the park-level model."""
     d = when.date()
     f = forecast_for(d)
     hol_mult, hol_label = holiday_factor(d)
-
-    open_hour = 8 if early_entry else 9
-    close_hour = 22
-
     return {
         "hour": when.hour,
         "minute_bucket": (when.minute // 15) * 15,
@@ -58,6 +54,35 @@ def build_feature_row(
         "holiday_mult": hol_mult,
         "crowd_base_mult": f.base_multiplier,
         "hour_mult": hourly_factor(when.hour),
+    }
+
+
+# Per-ride features: everything in park features + ride attributes +
+# the park-model's predicted park_avg as a borrowed-strength input.
+RIDE_FEATURE_NAMES: list[str] = PARK_FEATURE_NAMES + [
+    "novelty_mult",
+    "ride_tier",
+    "capacity_per_hour",
+    "is_first_hour_open",
+    "is_last_hour_open",
+    "has_express",
+    "has_single_rider",
+    "early_entry",
+    "park_avg_pred",
+]
+
+
+def build_ride_feature_row(
+    a: Attraction,
+    when: datetime,
+    early_entry: bool = False,
+    park_avg_pred: float = 0.0,
+) -> dict:
+    row = build_park_feature_row(when)
+    d = when.date()
+    open_hour = 8 if early_entry else 9
+    close_hour = 22
+    row.update({
         "novelty_mult": novelty_factor(d),
         "ride_tier": a.tier,
         "capacity_per_hour": a.capacity_per_hour or 0,
@@ -66,4 +91,15 @@ def build_feature_row(
         "has_express": int(a.has_express),
         "has_single_rider": int(a.has_single_rider),
         "early_entry": int(early_entry),
-    }
+        "park_avg_pred": float(park_avg_pred),
+    })
+    return row
+
+
+# Back-compat alias for any code still importing the old name.
+FEATURE_NAMES = RIDE_FEATURE_NAMES
+
+
+def build_feature_row(a: Attraction, when: datetime, early_entry: bool = False) -> dict:
+    """Legacy single-stage feature builder (no park_avg_pred). Kept for compatibility."""
+    return build_ride_feature_row(a, when, early_entry=early_entry, park_avg_pred=0.0)

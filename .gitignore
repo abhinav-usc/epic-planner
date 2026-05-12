@@ -12,3 +12,11 @@ data/live_log.csv
 .env.*
 !.env.example
 frontend/tsconfig.tsbuildinfo
+scripts/qt_cookies.json
+data/historical_waits.csv
+data/park_level_history.csv
+data/td_scrape_progress.txt
+data/td_parks_progress.txt
+.claude/settings.local.json
+/tmp/qt_*
+/tmp/td_*

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../api/client";
 import { usePlanner } from "../store/plannerStore";
 import type { Attraction, DayCurve } from "../types";
@@ -21,6 +21,8 @@ export function WaitTimeChart({ attraction }: { attraction: Attraction }) {
   const minWait = curve ? Math.min(...curve.hours.map(h => h.wait_minutes)) : 0;
   const maxWait = curve ? Math.max(...curve.hours.map(h => h.wait_minutes)) : 0;
   const bestHour = curve?.hours.find(h => h.wait_minutes === minWait);
+  const maxWorstCase = curve ? Math.max(...curve.hours.map(h => h.worst_case_wait ?? 0)) : 0;
+  const hasWorstCase = maxWorstCase > 0;
 
   return (
     <div className="panel p-4">
@@ -36,7 +38,7 @@ export function WaitTimeChart({ attraction }: { attraction: Attraction }) {
 
       {curve && !loading && (
         <>
-          <div className="grid grid-cols-3 gap-2 text-center mb-3 text-xs">
+          <div className="grid grid-cols-4 gap-2 text-center mb-3 text-xs">
             <div className="card px-2 py-1.5">
               <div className="text-ink-secondary">Best</div>
               <div className="font-semibold text-green-400">
@@ -45,7 +47,13 @@ export function WaitTimeChart({ attraction }: { attraction: Attraction }) {
             </div>
             <div className="card px-2 py-1.5">
               <div className="text-ink-secondary">Peak</div>
-              <div className="font-semibold text-red-400">{maxWait}m</div>
+              <div className="font-semibold text-amber-400">{maxWait}m</div>
+            </div>
+            <div className="card px-2 py-1.5" title="Historical 90th-percentile worst case">
+              <div className="text-ink-secondary">Worst</div>
+              <div className="font-semibold text-red-400">
+                {hasWorstCase ? `${maxWorstCase}m` : "—"}
+              </div>
             </div>
             <div className="card px-2 py-1.5">
               <div className="text-ink-secondary">Ride</div>
@@ -72,9 +80,19 @@ export function WaitTimeChart({ attraction }: { attraction: Attraction }) {
                 <Tooltip
                   contentStyle={{ background: "#13131D", border: "1px solid #22222F", borderRadius: 6 }}
                   labelFormatter={(h: number) => `${((h + 11) % 12) + 1}:00 ${h >= 12 ? "PM" : "AM"}`}
-                  formatter={(v: number) => [`${v} min`, "Wait"]}
+                  formatter={(v: number, name: string) => [`${v} min`, name === "wait_minutes" ? "Expected" : "Worst case (p90)"]}
                 />
                 <Area type="monotone" dataKey="wait_minutes" stroke={color} fill="url(#grad)" strokeWidth={2} />
+                {hasWorstCase && (
+                  <Line
+                    type="monotone"
+                    dataKey="worst_case_wait"
+                    stroke="#EF4444"
+                    strokeWidth={1.5}
+                    strokeDasharray="4 4"
+                    dot={false}
+                  />
+                )}
               </AreaChart>
             </ResponsiveContainer>
           </div>

@@ -123,9 +123,12 @@ QT_ID_TO_LOCAL = {
 
 
 def load_live_log() -> pd.DataFrame:
-    if not LIVE_LOG.exists():
+    if not LIVE_LOG.exists() or LIVE_LOG.stat().st_size == 0:
         return pd.DataFrame()
-    df = pd.read_csv(LIVE_LOG)
+    try:
+        df = pd.read_csv(LIVE_LOG)
+    except pd.errors.EmptyDataError:
+        return pd.DataFrame()
     if df.empty:
         return df
 
@@ -152,6 +155,79 @@ def load_live_log() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+# ── thrill-data historical ingest ────────────────────────────────────────────
+# CSV produced by scripts/td_scrape.py with columns:
+#   attraction_slug, attraction_name, date, hour, wait_minutes
+
+HISTORICAL_CSV = ROOT / "data" / "historical_waits.csv"
+
+# Map thrill-data attraction slugs → our local attraction IDs from attractions_db.
+TD_SLUG_TO_LOCAL = {
+    "stardustracers": "stardust_racers",
+    "constellationcarousel": "constellation_carousel",
+    "astronomica": "astronomica",
+    "mariokartbowserschallenge": "mario_kart",
+    "minecartmadness": "mine_cart_madness",
+    "yoshisadventure": "yoshis_adventure",
+    "bowserjrchallenge": "bowser_jr_showdown",
+    "meetmarioandluigi": "meet_mario_luigi",
+    "meetprincesspeach": "meet_princess_peach",
+    "meetdonkeykong": "meet_donkey_kong",
+    "harrypotterandthebattleattheministry": "battle_at_ministry",
+    "lecirquearcanus": "le_cirque_arcanus",
+    "hiccupswinggliders": "hiccups_wing_gliders",
+    "dragonracersrally": "dragon_racers_rally",
+    "fyredrill": "fyre_drill",
+    "theuntrainabledragon": "untrainable_dragon",
+    "vikingtrainingcamp": "viking_training_camp",
+    "meettoothlessandfriends": "meet_toothless",
+    "meettoothlesshiccup": "meet_toothless_hiccup",
+    "monstersunchainedthefrankensteinexperiment": "monsters_unchained",
+    "curseofthewerewolf": "curse_of_werewolf",
+    "darkuniversecharactermeetgreet": "dark_universe_meet",
+}
+
+
+def load_historical_thrilldata() -> pd.DataFrame:
+    if not HISTORICAL_CSV.exists():
+        log.info("No thrill-data history yet at %s — running on synthetic only.", HISTORICAL_CSV)
+        return pd.DataFrame()
+    df = pd.read_csv(HISTORICAL_CSV)
+    if df.empty:
+        return df
+
+    log.info("Loaded %d raw thrill-data rows", len(df))
+    out_rows = []
+    skipped_unknown = 0
+    for slug, sub in df.groupby("attraction_slug"):
+        local_id = TD_SLUG_TO_LOCAL.get(slug)
+        if not local_id:
+            skipped_unknown += len(sub)
+            continue
+        a = attraction_by_id(local_id)
+        if a is None:
+            skipped_unknown += len(sub)
+            continue
+        for _, r in sub.iterrows():
+            try:
+                d = date.fromisoformat(r["date"])
+                hour = int(r["hour"])
+                wait = float(r["wait_minutes"])
+            except Exception:
+                continue
+            # Filter: thrill-data records "5" for closed/no-data — treat as missing
+            # only when ride is also clearly outside likely operating hours.
+            # The model needs to learn closing/opening anyway, so we keep 5s.
+            when = datetime.combine(d, datetime.min.time()).replace(hour=hour)
+            early = (hour < 9)
+            feat = build_feature_row(a, when, early_entry=early)
+            feat["__target"] = wait
+            out_rows.append(feat)
+    log.info("Mapped %d thrill-data rows to known attractions (%d skipped: unknown slug)",
+             len(out_rows), skipped_unknown)
+    return pd.DataFrame(out_rows)
+
+
 # ── Train ────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -159,15 +235,24 @@ def main() -> None:
     syn = generate_synthetic(n_dates=120)
     log.info("  synthetic rows: %d", len(syn))
 
+    pieces = [syn]
+
+    # Real thrill-data history is the most trustworthy. Oversample it heavily.
+    hist = load_historical_thrilldata()
+    if not hist.empty:
+        log.info("  thrill-data rows: %d (will be oversampled 8×)", len(hist))
+        pieces.append(pd.concat([hist] * 8, ignore_index=True))
+    else:
+        log.info("  thrill-data rows: 0  (run scripts/td_scrape.py first)")
+
+    # Live queue-times log (if you've been running scripts/fetch_historical.py)
     live = load_live_log()
     if not live.empty:
-        log.info("Loaded %d live-log rows from %s", len(live), LIVE_LOG)
-        # Live data is *much* more trustworthy; oversample it.
-        live = pd.concat([live] * 5, ignore_index=True)
-        df = pd.concat([syn, live], ignore_index=True)
-    else:
-        log.info("No live log yet — training on synthetic only.")
-        df = syn
+        log.info("  live-log rows: %d (will be oversampled 5×)", len(live))
+        pieces.append(pd.concat([live] * 5, ignore_index=True))
+
+    df = pd.concat(pieces, ignore_index=True)
+    log.info("  combined rows: %d", len(df))
 
     X = df[FEATURE_NAMES]
     y = df["__target"]
@@ -175,17 +260,24 @@ def main() -> None:
     Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, random_state=42)
 
     model = GradientBoostingRegressor(
-        n_estimators=400,
-        max_depth=4,
+        n_estimators=600,
+        max_depth=5,
         learning_rate=0.05,
         random_state=42,
     )
-    log.info("Fitting GradientBoostingRegressor…")
+    log.info("Fitting GradientBoostingRegressor (n=%d)…", len(Xtr))
     model.fit(Xtr, ytr)
 
     preds = model.predict(Xte)
     mae = mean_absolute_error(yte, preds)
     log.info("Test MAE: %.2f minutes  (n_test=%d)", mae, len(yte))
+
+    # Also evaluate MAE on real-only data to gauge how well it predicts reality.
+    if not hist.empty:
+        Xh = hist[FEATURE_NAMES]
+        yh = hist["__target"]
+        mae_real = mean_absolute_error(yh, model.predict(Xh))
+        log.info("MAE on real thrill-data only: %.2f minutes", mae_real)
 
     MODEL_OUT.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump({"model": model, "feature_names": FEATURE_NAMES, "mae": mae}, MODEL_OUT)

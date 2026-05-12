@@ -55,6 +55,8 @@ export interface CrowdForecast {
 export interface HourPrediction {
   hour: number;
   wait_minutes: number;
+  worst_case_wait: number | null;
+  worst_case_n: number;
   crowd_multiplier: number;
 }
 

@@ -11,7 +11,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.routers import attractions, crowd, predictions, optimization, ai
+from backend.routers import attractions, crowd, predictions, optimization, ai, data_refresh
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -37,6 +37,7 @@ app.include_router(crowd.router)
 app.include_router(predictions.router)
 app.include_router(optimization.router)
 app.include_router(ai.router)
+app.include_router(data_refresh.router)
 
 
 @app.get("/api/health")

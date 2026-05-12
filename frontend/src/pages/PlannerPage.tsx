@@ -14,8 +14,33 @@ import type { Attraction } from "../types";
 export function PlannerPage() {
   const { loaded, catalogError, loadCatalog, addPlannedItem, movePlannedItem, targetDate, earlyEntry, plannedItems } = usePlanner();
   const [selected, setSelected] = useState<Attraction | null>(null);
+  const [refreshNote, setRefreshNote] = useState<string | null>(null);
 
   useEffect(() => { loadCatalog(); }, [loadCatalog]);
+
+  // On mount: check data freshness; if stale, kick off a background refresh.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const f = await api.dataFreshness();
+        if (!alive) return;
+        if (f.refresh_running) {
+          setRefreshNote("Updating wait-time data…");
+        } else if (f.needs_refresh) {
+          setRefreshNote(
+            `Wait-time data is ${f.epic_age_days ?? "?"} days old. Refreshing…`
+          );
+          await api.dataRefresh();
+        }
+        // poll-clear: when refresh ends we just stop showing the banner
+        setTimeout(() => alive && setRefreshNote(null), 5000);
+      } catch {
+        // backend unreachable; PlannerPage already shows the error elsewhere
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
@@ -77,6 +102,11 @@ export function PlannerPage() {
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
       <div className="h-screen flex flex-col">
         <SettingsBar />
+        {refreshNote && (
+          <div className="px-4 py-1 text-xs bg-bg-card text-ink-secondary border-b border-bg-hover">
+            ↻ {refreshNote}
+          </div>
+        )}
         <div className="flex-1 flex min-h-0">
           <LandSidebar onAttractionClick={setSelected} selectedId={selected?.id ?? null} />
           <main className="flex-1 flex flex-col min-w-0">

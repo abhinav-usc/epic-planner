@@ -73,4 +73,17 @@ export const api = {
       body: JSON.stringify({ topic, kind }),
     });
   },
+  async dataFreshness(): Promise<{
+    latest_epic_date: string | null;
+    latest_park_date: string | null;
+    epic_age_days: number | null;
+    park_age_days: number | null;
+    needs_refresh: boolean;
+    refresh_running: boolean;
+  }> {
+    return jsonFetch("/api/data/freshness");
+  },
+  async dataRefresh(): Promise<{ started: boolean; reason: string }> {
+    return jsonFetch("/api/data/refresh", { method: "POST" });
+  },
 };

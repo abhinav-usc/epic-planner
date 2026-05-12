@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from backend.data.attractions_db import attraction_by_id
 from backend.ml.model import predictor
+from backend.ml.worst_case import lookup as worst_case_lookup
 
 
 router = APIRouter(prefix="/api", tags=["predictions"])
@@ -66,9 +67,12 @@ def attraction_day_curve(
     for h in range(open_h, close_h):
         when = datetime.combine(d, datetime.min.time()).replace(hour=h)
         p = predictor.predict(a, when, early_entry=early_entry)
+        wc = worst_case_lookup.worst_case(a.id, d, h)
         hours.append({
             "hour": h,
             "wait_minutes": p.wait_minutes,
+            "worst_case_wait": wc["wait_minutes"] if wc else None,
+            "worst_case_n": wc["sample_size"] if wc else 0,
             "crowd_multiplier": p.crowd_multiplier,
         })
     return {"attraction_id": a.id, "date": d.isoformat(), "hours": hours}

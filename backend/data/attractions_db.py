@@ -158,6 +158,36 @@ ATTRACTIONS: list[Attraction] = [
         queue_times_id=14682,
         description="Interactive Power-Up Band challenge against Bowser Jr.",
     ),
+    Attraction(
+        id="meet_mario_luigi",
+        name="Meet Mario and Luigi",
+        land="super_nintendo_world",
+        kind="experience",
+        tier=2,
+        duration_minutes=5,
+        has_express=False,
+        description="Character meet-and-greet with Mario and Luigi.",
+    ),
+    Attraction(
+        id="meet_princess_peach",
+        name="Meet Princess Peach",
+        land="super_nintendo_world",
+        kind="experience",
+        tier=2,
+        duration_minutes=5,
+        has_express=False,
+        description="Character meet-and-greet with Princess Peach.",
+    ),
+    Attraction(
+        id="meet_donkey_kong",
+        name="Meet Donkey Kong",
+        land="super_nintendo_world",
+        kind="experience",
+        tier=2,
+        duration_minutes=5,
+        has_express=False,
+        description="Character meet-and-greet with Donkey Kong.",
+    ),
 
     # ── Ministry of Magic ─────────────────────────────────────────────────────
     Attraction(
@@ -245,6 +275,16 @@ ATTRACTIONS: list[Attraction] = [
         description="Animatronic Toothless plus Hiccup and Astrid character meet.",
     ),
     Attraction(
+        id="meet_toothless_hiccup",
+        name="Meet Toothless & Hiccup",
+        land="isle_of_berk",
+        kind="experience",
+        tier=2,
+        duration_minutes=5,
+        has_express=False,
+        description="Standalone meet-and-greet with the live Hiccup actor (separate from the Toothless animatronic show).",
+    ),
+    Attraction(
         id="viking_training_camp",
         name="Viking Training Camp",
         land="isle_of_berk",
@@ -289,6 +329,16 @@ ATTRACTIONS: list[Attraction] = [
         duration_minutes=30,
         has_express=False,
         description="Become a classic monster via professional makeup.",
+    ),
+    Attraction(
+        id="dark_universe_meet",
+        name="Dark Universe Character Meet & Greet",
+        land="dark_universe",
+        kind="experience",
+        tier=2,
+        duration_minutes=5,
+        has_express=False,
+        description="Meet the classic Universal Monsters (Invisible Man, Frankenstein's Monster, etc.).",
     ),
 ]
 
