@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+node_modules/
+frontend/dist/
+backend/ml/saved_model.pkl
+data/live_log.csv
+.DS_Store
+.env
+.env.*
+!.env.example
+frontend/tsconfig.tsbuildinfo

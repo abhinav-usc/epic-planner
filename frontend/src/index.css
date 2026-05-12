@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+    background: theme(colors.bg.base);
+  }
+  body {
+    font-family: theme(fontFamily.sans);
+    color: theme(colors.ink.primary);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: rgba(251, 191, 36, 0.30);
+  }
+  /* Scrollbar styling */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: theme(colors.bg.base); }
+  ::-webkit-scrollbar-thumb { background: theme(colors.bg.hover); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: theme(colors.ink.muted); }
+}
+
+@layer components {
+  .panel {
+    @apply bg-bg-panel border border-bg-hover rounded-lg;
+  }
+  .card {
+    @apply bg-bg-card border border-bg-hover rounded-md;
+  }
+  .btn {
+    @apply px-3 py-1.5 rounded-md text-sm font-medium transition-colors;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-bg-base hover:bg-amber-300;
+  }
+  .btn-ghost {
+    @apply btn bg-bg-hover text-ink-primary hover:bg-bg-card;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+}
