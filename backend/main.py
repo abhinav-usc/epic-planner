@@ -9,15 +9,19 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from backend.routers import attractions, crowd, predictions, optimization, ai, data_refresh
 from backend.routers import ll_monitor
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+_STATIC = Path(__file__).parent.parent / "frontend" / "dist"
 
 
 @asynccontextmanager
@@ -56,3 +60,8 @@ app.include_router(ll_monitor.router)
 @app.get("/api/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+# Serve built frontend (production). Must be mounted last so /api routes win.
+if _STATIC.exists():
+    app.mount("/", StaticFiles(directory=_STATIC, html=True), name="static")
