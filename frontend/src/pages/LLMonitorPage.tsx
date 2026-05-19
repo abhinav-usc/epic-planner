@@ -117,19 +117,18 @@ export function LLMonitorPage() {
   const [notifPerm, setNotifPerm] = useState<NotificationPermission>(
     typeof Notification !== "undefined" ? Notification.permission : "denied"
   );
-  const prevStates = useRef<Record<string, string | null>>({});
+  const prevLL = useRef<Record<string, string | null>>({});
+  const prevStatus = useRef<Record<string, string | null>>({});
+  const isFirstUpdate = useRef(true);
 
-  // Ask for notification permission
   async function requestNotifs() {
     const perm = await Notification.requestPermission();
     setNotifPerm(perm);
   }
 
-  // Fire browser notification for newly available ride
-  function notify(name: string, returnStart: string | null) {
+  function notify(title: string, body: string) {
     if (notifPerm !== "granted") return;
-    const body = returnStart ? `Return window starts at ${fmt12(returnStart)}` : "Book now!";
-    new Notification(`⚡ ${name} Lightning Lane Available!`, { body, icon: "/favicon.ico" });
+    new Notification(title, { body, icon: "/favicon.ico" });
   }
 
   useEffect(() => {
@@ -148,15 +147,40 @@ export function LLMonitorPage() {
           setSnapshot(data);
           setConnState("live");
 
-          // Check for newly available rides
+          // Skip notifications on first update (don't blast alerts on page load)
+          if (isFirstUpdate.current) {
+            isFirstUpdate.current = false;
+            for (const key of RIDE_KEYS) {
+              const ride = data.rides[key];
+              if (!ride) continue;
+              prevLL.current[key] = ride.llState ?? null;
+              prevStatus.current[key] = ride.status ?? null;
+            }
+            return;
+          }
+
           for (const key of RIDE_KEYS) {
             const ride = data.rides[key];
             if (!ride) continue;
-            const prev = prevStates.current[key];
-            if (ride.llState === "AVAILABLE" && prev !== "AVAILABLE") {
-              notify(ride.name, ride.returnStart);
+
+            // LL availability change
+            const prevLLState = prevLL.current[key];
+            if (ride.llState === "AVAILABLE" && prevLLState !== "AVAILABLE") {
+              const body = ride.returnStart ? `Return window: ${fmt12(ride.returnStart)}` : "Book now!";
+              notify(`⚡ ${ride.name} LL Available!`, body);
             }
-            prevStates.current[key] = ride.llState ?? null;
+            prevLL.current[key] = ride.llState ?? null;
+
+            // Ride open/close change
+            const prevSt = prevStatus.current[key];
+            if (prevSt !== null && prevSt !== ride.status) {
+              if (ride.status === "OPERATING") {
+                notify(`✅ ${ride.name} is now OPEN`, "Ride is back up!");
+              } else if (prevSt === "OPERATING") {
+                notify(`🚫 ${ride.name} is now ${ride.status}`, "Ride went down.");
+              }
+            }
+            prevStatus.current[key] = ride.status ?? null;
           }
         } catch {/* ignore parse errors */}
       };
