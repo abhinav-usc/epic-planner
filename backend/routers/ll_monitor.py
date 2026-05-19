@@ -147,7 +147,8 @@ async def debug_raw() -> dict:
             if key in name_lower:
                 results[key] = item  # full raw item
                 break
-    return {"raw": results, "totalItems": len(data.get("liveData", []))}
+    all_items = [{"name": i.get("name"), "id": i.get("id"), "keys": list(i.keys())} for i in data.get("liveData", [])]
+    return {"raw": results, "totalItems": len(data.get("liveData", [])), "allItems": all_items, "topLevelKeys": list(data.keys())}
 async def sse_stream() -> StreamingResponse:
     """SSE stream – sends a new event every time the poller runs."""
     q: asyncio.Queue = asyncio.Queue(maxsize=4)
