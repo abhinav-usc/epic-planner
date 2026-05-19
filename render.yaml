@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: epic-planner
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    region: oregon   # closest free region to Disneyland
+    healthCheckPath: /api/health
+    envVars: []
