@@ -33,6 +33,7 @@ _TRACKED = {
     "matterhorn": "Matterhorn Bobsleds",
     "indiana jones": "Indiana Jones Adventure",
     "star tours": "Star Tours – The Adventures Continue",
+    "jungle cruise": "Jungle Cruise",
 }
 
 _park_live_url: str = _PARK_LIVE_URL
@@ -54,7 +55,7 @@ async def _fetch() -> dict:
         for key in _TRACKED:
             if key in name_lower:
                 queue = item.get("queue", {})
-                ll = queue.get("PAID_RETURN_TIME") or {}
+                ll = queue.get("RETURN_TIME") or {}
                 standby = queue.get("STANDBY") or {}
                 rides[key] = {
                     "name": item.get("name", _TRACKED[key]),
