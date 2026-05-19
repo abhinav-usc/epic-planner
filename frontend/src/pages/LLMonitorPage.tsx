@@ -163,7 +163,7 @@ export function LLMonitorPage() {
       es.onerror = () => {
         setConnState("error");
         es.close();
-        retryTimeout = setTimeout(connect, 5000);
+        retryTimeout = setTimeout(connect, 3000);
       };
     }
 
@@ -186,7 +186,7 @@ export function LLMonitorPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold text-ink-primary">⚡ LL Monitor</h1>
-          <p className="text-ink-muted text-sm mt-0.5">Disneyland · checks every 2 min</p>
+          <p className="text-ink-muted text-sm mt-0.5">Disneyland · checks every 1 min</p>
         </div>
         <div className="flex items-center gap-2">
           <span
@@ -200,19 +200,22 @@ export function LLMonitorPage() {
       </div>
 
       {/* Notification permission banner */}
-      {notifPerm !== "granted" && (
+      {notifPerm === "granted" ? (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-sm px-4 py-2 flex items-center gap-2">
+          <span>✓</span> Notifications on — you'll be pinged when a lane opens
+        </div>
+      ) : typeof Notification === "undefined" ? (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-300 text-sm px-4 py-3">
+          📱 <strong>iOS:</strong> To get notifications, tap the Share button → <strong>"Add to Home Screen"</strong> → open from there
+        </div>
+      ) : (
         <button
           onClick={requestNotifs}
           className="w-full rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-300 text-sm px-4 py-3 text-left flex items-center justify-between hover:bg-amber-500/15 transition-colors"
         >
-          <span>🔔 Enable browser notifications to get pinged when a ride opens</span>
+          <span>🔔 Enable notifications to get pinged when a ride opens</span>
           <span className="font-semibold shrink-0 ml-3">Allow →</span>
         </button>
-      )}
-      {notifPerm === "granted" && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-sm px-4 py-2 flex items-center gap-2">
-          <span>✓</span> Notifications on — you'll be pinged when a lane opens
-        </div>
       )}
 
       {/* Ride cards */}
