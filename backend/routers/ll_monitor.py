@@ -117,27 +117,21 @@ async def get_status() -> dict:
 
 
 @router.get("/debug")
-async def debug_destinations() -> dict:
-    """Show Disneyland-related destinations and park IDs from themeparks.wiki."""
+async def debug_rides() -> dict:
+    """Show full raw data for tracked rides so we can verify field names."""
     async with httpx.AsyncClient(timeout=20) as client:
-        r = await client.get(_DESTINATIONS_URL)
+        r = await client.get(_park_live_url)
         r.raise_for_status()
         data = r.json()
 
-    disney = []
-    for dest in data.get("destinations", []):
-        name = dest.get("name", "").lower()
-        if "disneyland" in name or "anaheim" in name:
-            disney.append({
-                "destination": dest.get("name"),
-                "id": dest.get("id"),
-                "parks": dest.get("parks", []),
-            })
-    return {
-        "resolvedParkUrl": _park_live_url,
-        "disneylandDestinations": disney,
-        "totalDestinations": len(data.get("destinations", [])),
-    }
+    results = {}
+    for item in data.get("liveData", []):
+        name_lower = item.get("name", "").lower()
+        for key in _TRACKED:
+            if key in name_lower:
+                results[key] = item  # full raw item, no filtering
+                break
+    return {"rides": results, "totalItems": len(data.get("liveData", []))}
 
 
 async def _event_generator(q: asyncio.Queue) -> AsyncGenerator[str, None]:
