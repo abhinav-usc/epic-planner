@@ -23,7 +23,9 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ll", tags=["ll-monitor"])
 
-_DESTINATIONS_URL = "https://api.themeparks.wiki/v1/destinations"
+# Disneyland Park, Anaheim CA (from themeparks.wiki destinations endpoint)
+_PARK_ID = "7340550b-c14d-4def-80bb-acdb51d49a66"
+_PARK_LIVE_URL = f"https://api.themeparks.wiki/v1/entity/{_PARK_ID}/live"
 _POLL_INTERVAL = 30  # seconds
 
 _TRACKED = {
@@ -33,43 +35,14 @@ _TRACKED = {
     "star tours": "Star Tours – The Adventures Continue",
 }
 
-# Resolved at first poll
-_park_live_url: str | None = None
+_park_live_url: str = _PARK_LIVE_URL
 
 # Shared state
 _latest: dict = {"rides": {}, "fetchedAt": None}
 _subscribers: list[asyncio.Queue] = []
 
 
-async def _resolve_park_url() -> str:
-    """Walk the destinations list to find Disneyland Park (not California Adventure)."""
-    async with httpx.AsyncClient(timeout=20) as client:
-        r = await client.get(_DESTINATIONS_URL)
-        r.raise_for_status()
-        destinations = r.json().get("destinations", [])
-
-    for dest in destinations:
-        name = dest.get("name", "").lower()
-        if "disneyland" not in name and "anaheim" not in name:
-            continue
-        for park in dest.get("parks", []):
-            park_name = park.get("name", "").lower()
-            # Disneyland Park, not California Adventure
-            if "disneyland park" in park_name or (
-                "disneyland" in park_name and "california adventure" not in park_name
-            ):
-                park_id = park["id"]
-                log.info("Resolved Disneyland Park ID: %s (%s)", park_id, park.get("name"))
-                return f"https://api.themeparks.wiki/v1/entity/{park_id}/live"
-
-    raise RuntimeError("Could not find Disneyland Park in destinations list")
-
-
 async def _fetch() -> dict:
-    global _park_live_url
-    if _park_live_url is None:
-        _park_live_url = await _resolve_park_url()
-
     async with httpx.AsyncClient(timeout=20) as client:
         r = await client.get(_park_live_url)
         r.raise_for_status()
@@ -127,7 +100,6 @@ async def poll_loop() -> None:
             log.info("LL poll OK – %d subscriber(s)", len(_subscribers))
         except Exception as exc:
             log.warning("LL poll failed: %s", exc)
-            _park_live_url = None  # force re-resolve on next attempt
         await asyncio.sleep(_POLL_INTERVAL)
 
 
