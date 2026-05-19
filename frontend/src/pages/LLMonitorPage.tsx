@@ -16,12 +16,13 @@ interface Snapshot {
   error?: string;
 }
 
-const RIDE_KEYS = ["big thunder", "matterhorn", "indiana jones"] as const;
+const RIDE_KEYS = ["big thunder", "matterhorn", "indiana jones", "star tours"] as const;
 
 const RIDE_EMOJI: Record<string, string> = {
   "big thunder": "⛏️",
   "matterhorn": "🏔️",
   "indiana jones": "🪬",
+  "star tours": "🚀",
 };
 
 function fmt12(iso: string | null): string {
@@ -186,7 +187,7 @@ export function LLMonitorPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold text-ink-primary">⚡ LL Monitor</h1>
-          <p className="text-ink-muted text-sm mt-0.5">Disneyland · checks every 1 min</p>
+          <p className="text-ink-muted text-sm mt-0.5">Disneyland · checks every 30s</p>
         </div>
         <div className="flex items-center gap-2">
           <span

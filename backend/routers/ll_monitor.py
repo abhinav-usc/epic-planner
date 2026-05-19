@@ -26,12 +26,13 @@ router = APIRouter(prefix="/api/ll", tags=["ll-monitor"])
 # themeparks.wiki entity ID for Disneyland Park (California)
 _PARK_ID = "b7678dab-5544-48d5-8fdc-c1a0127cfbcd"
 _LIVE_URL = f"https://api.themeparks.wiki/v1/entity/{_PARK_ID}/live"
-_POLL_INTERVAL = 60  # seconds
+_POLL_INTERVAL = 30  # seconds
 
 _TRACKED = {
     "big thunder": "Big Thunder Mountain Railroad",
     "matterhorn": "Matterhorn Bobsleds",
     "indiana jones": "Indiana Jones Adventure",
+    "star tours": "Star Tours – The Adventures Continue",
 }
 
 # Shared state
