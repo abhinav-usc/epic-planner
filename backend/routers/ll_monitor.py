@@ -62,7 +62,7 @@ async def _fetch() -> dict:
                     "llState": ll.get("state"),
                     "returnStart": ll.get("returnStart"),
                     "returnEnd": ll.get("returnEnd"),
-                    "price": (ll.get("price") or {}).get("amount"),
+                    "price": ((ll.get("price") or {}).get("amount") or 0) / 100 or None,
                     "waitMinutes": standby.get("waitTime"),
                 }
                 break
