@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ll", tags=["ll-monitor"])
 
 # themeparks.wiki entity ID for Disneyland Park (California)
-_PARK_ID = "dea838b9-e0d9-4cf5-989e-ed5e2b9a9e2a"
+_PARK_ID = "b7678dab-5544-48d5-8fdc-c1a0127cfbcd"
 _LIVE_URL = f"https://api.themeparks.wiki/v1/entity/{_PARK_ID}/live"
 _POLL_INTERVAL = 60  # seconds
 
