@@ -13,6 +13,12 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from backend.data.disneyland_db import DL_ATTRACTIONS, DL_LANDS
+from backend.data.disney_db import (
+    ALL_DISNEY_LANDS,
+    DISNEY_SLUG_TO_LAND,
+    DISNEY_SLUG_TO_NAME,
+    DISNEY_PARKS,
+)
 
 router = APIRouter(prefix="/api/history", tags=["history"])
 
@@ -46,11 +52,14 @@ ALL_LAND_COLORS: dict[str, str] = {
     "isle_of_berk":         "#059669",
     "dark_universe":        "#9333EA",
     **{lid: info["color"] for lid, info in DL_LANDS.items()},
+    **{lid: info["color"] for lid, info in ALL_DISNEY_LANDS.items()},
 }
 
 # ── Disneyland slug lookups (built from the attraction DB) ─────────────────────
 DL_SLUG_TO_LAND = {re.sub(r"[^a-z0-9]", "", a.name.lower()): a.land for a in DL_ATTRACTIONS}
 DL_SLUG_TO_NAME = {re.sub(r"[^a-z0-9]", "", a.name.lower()): a.name for a in DL_ATTRACTIONS}
+
+WDW_PARKS = set(DISNEY_PARKS.keys())
 
 # Fallback slug aliases for name mismatches between scrape and our DB
 _SLUG_ALIASES: dict[str, str] = {
@@ -174,10 +183,15 @@ def day_detail(date: str, park: str = Query("epic_universe")) -> dict:
         if date not in park_data:
             raise HTTPException(status_code=404, detail=f"No data for {date} in {park}")
         day = park_data[date]
+        is_wdw = park in WDW_PARKS
         attractions = []
         for slug, hours_raw in sorted(day.items()):
-            land = DL_SLUG_TO_LAND.get(slug, "dl_main_street")
-            name = DL_SLUG_TO_NAME.get(slug, slug.replace("_", " ").title())
+            if is_wdw:
+                land = DISNEY_SLUG_TO_LAND.get(slug, "mk_main_street")
+                name = DISNEY_SLUG_TO_NAME.get(slug, slug.replace("_", " ").title())
+            else:
+                land = DL_SLUG_TO_LAND.get(slug, "dl_main_street")
+                name = DL_SLUG_TO_NAME.get(slug, slug.replace("_", " ").title())
             hours = [{"hour": h, "wait_minutes": round(hours_raw[h]) if h in hours_raw else None}
                      for h in range(8, 22)]
             all_waits = list(hours_raw.values())

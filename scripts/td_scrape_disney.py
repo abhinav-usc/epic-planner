@@ -37,7 +37,7 @@ OUT_CSV = ROOT / "data" / "disney_waits.csv"
 OUT_CSV.parent.mkdir(parents=True, exist_ok=True)
 PROGRESS_FILE = ROOT / "data" / "td_disney_progress.txt"
 
-DEFAULT_SINCE = date(2022, 5, 14)   # 4 years back
+DEFAULT_SINCE = date(2021, 5, 14)   # 5 years back
 DEFAULT_STEP_DAYS = 30
 
 

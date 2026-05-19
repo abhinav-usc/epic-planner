@@ -8,7 +8,12 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from backend.data.attractions_db import attraction_by_id
-from backend.data.disney_db import disney_attraction_by_id
+from backend.data.disney_db import (
+    disney_attraction_by_id,
+    REFURB_EVENTS,
+    TEMPORARILY_CLOSED,
+    refurb_factor,
+)
 from backend.data.disneyland_db import disneyland_attraction_by_id
 from backend.data.historical_waits import historical_db, disney_historical_db
 from backend.data.live_waits_cache import live_cache
@@ -173,7 +178,29 @@ def attraction_day_curve(
 
     result_hours = _apply_live_history(result_hours, a.id, park, target_date=d)
 
-    return {"attraction_id": a.id, "date": d.isoformat(), "hours": result_hours, "source": "predicted"}
+    # Apply refurbishment / grand-opening multiplier for recently reopened rides.
+    refurb_note: Optional[str] = None
+    if event := REFURB_EVENTS.get(a.id):
+        factor = refurb_factor(event, d)
+        if factor != 1.0:
+            result_hours = [
+                {**r, "wait_minutes": max(1, int(round(r["wait_minutes"] * factor)))}
+                for r in result_hours
+            ]
+            refurb_note = event.note
+
+    closed_before = TEMPORARILY_CLOSED.get(a.id)
+    is_closed = closed_before is not None and d < closed_before
+
+    return {
+        "attraction_id": a.id,
+        "date": d.isoformat(),
+        "hours": result_hours,
+        "source": "predicted",
+        "temporarily_closed": is_closed,
+        "reopens": closed_before.isoformat() if is_closed else None,
+        "refurb_note": refurb_note,
+    }
 
 
 class DayCurvesRequest(BaseModel):

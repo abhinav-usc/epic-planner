@@ -1,6 +1,7 @@
 """Attractions / restaurants / lands endpoints (multi-park)."""
 from __future__ import annotations
 
+from datetime import date
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.data.attractions_db import (
@@ -53,11 +54,11 @@ def _resolve_lands(park: str) -> dict | None:
     return None
 
 
-def _resolve_attractions(park: str) -> list[dict] | None:
+def _resolve_attractions(park: str, visit_date: date | None = None) -> list[dict] | None:
     if park == EPIC_PARK_ID:
         return all_attractions()
     if park in DISNEY_PARKS:
-        return disney_attractions(park)
+        return disney_attractions(park, visit_date)
     if park == "disneyland":
         return disneyland_attractions()
     return None
@@ -97,8 +98,17 @@ def get_lands(park: str = Query(EPIC_PARK_ID)) -> dict:
 
 
 @router.get("/attractions")
-def get_attractions(park: str = Query(EPIC_PARK_ID)) -> list[dict]:
-    attrs = _resolve_attractions(park)
+def get_attractions(
+    park: str = Query(EPIC_PARK_ID),
+    visit_date: str = Query(None, description="YYYY-MM-DD — annotates closed/refurb rides"),
+) -> list[dict]:
+    parsed_date: date | None = None
+    if visit_date:
+        try:
+            parsed_date = date.fromisoformat(visit_date)
+        except ValueError:
+            pass
+    attrs = _resolve_attractions(park, parsed_date)
     if attrs is None:
         raise HTTPException(status_code=404, detail=f"Unknown park: {park}")
     return attrs

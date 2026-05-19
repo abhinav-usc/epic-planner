@@ -8,6 +8,7 @@ queue-times.com, and Touring Plans wait time data (2024-2025).
 from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
+from datetime import date
 from typing import Optional
 
 from backend.data.attractions_db import Attraction, Restaurant
@@ -480,7 +481,7 @@ EPCOT_ATTRACTIONS: list[Attraction] = [
     # ── World Nature ──────────────────────────────────────────────────────────
     Attraction(
         id="ep_soarin",
-        name="Soarin' Around the World",
+        name="Soarin' ★ Temporarily Closed (Soarin' Across America opens May 26)",
         land="ep_world_nature",
         kind="ride",
         tier=4,
@@ -488,7 +489,7 @@ EPCOT_ATTRACTIONS: list[Attraction] = [
         capacity_per_hour=2400,
         has_express=True,
         height_inches=40,
-        description="Hang-glider simulator soaring over world landmarks. Beloved for its scent and wide-angle screen.",
+        description="CLOSED May 25: film switching to 'Soarin' Across America' (US 250th anniversary). Reopens May 26.",
     ),
     Attraction(
         id="ep_living_land",
@@ -680,7 +681,7 @@ HS_ATTRACTIONS: list[Attraction] = [
     ),
     Attraction(
         id="hs_rock_n_roller",
-        name="Rock 'n' Roller Coaster Starring Aerosmith",
+        name="Rock 'n' Roller Coaster ★ Temporarily Closed (reopens May 26 as Muppets Coaster)",
         land="hs_sunset_boulevard",
         kind="ride",
         tier=5,
@@ -689,7 +690,7 @@ HS_ATTRACTIONS: list[Attraction] = [
         has_single_rider=True,
         has_express=True,
         height_inches=48,
-        description="Multi-inversion launched indoor coaster at 0 to 60 in 2.8 seconds. Loud Aerosmith rock soundtrack.",
+        description="CLOSED May 25: transitioning to Muppets Coaster (opens May 26). Multi-inversion launched indoor coaster, now Muppets-themed.",
     ),
     Attraction(
         id="hs_beauty_beast_show",
@@ -1204,8 +1205,24 @@ def disney_lands(park_id: str) -> dict:
     return {}
 
 
-def disney_attractions(park_id: str) -> list[dict]:
-    return [a.to_dict() for a in PARK_ATTRACTIONS.get(park_id, [])]
+def disney_attractions(park_id: str, visit_date: Optional[date] = None) -> list[dict]:
+    out = []
+    for a in PARK_ATTRACTIONS.get(park_id, []):
+        d = a.to_dict()
+        reopen = TEMPORARILY_CLOSED.get(a.id)
+        if reopen and visit_date and visit_date < reopen:
+            d["temporarily_closed"] = True
+            d["reopens"] = reopen.isoformat()
+        else:
+            d["temporarily_closed"] = reopen is not None and visit_date is None
+            d["reopens"] = reopen.isoformat() if reopen else None
+        ev = REFURB_EVENTS.get(a.id)
+        if ev and visit_date:
+            f = refurb_factor(ev, visit_date)
+            d["refurb_multiplier"] = round(f, 2) if f != 1.0 else None
+            d["refurb_note"] = ev.note if f != 1.0 else None
+        out.append(d)
+    return out
 
 
 def disney_restaurants(park_id: str) -> list[dict]:
@@ -1217,3 +1234,129 @@ def disney_attraction_by_id(attraction_id: str) -> Optional[Attraction]:
         if a.id == attraction_id:
             return a
     return None
+
+
+# ─── Thrill-data slug → local attraction ID (WDW parks) ───────────────────────
+# Used by history router (land lookup) and train_v5.py.
+
+DISNEY_SCRAPE_SLUG_MAP: dict[str, str] = {
+    "sevendwarfsminetrain":                         "mk_seven_dwarfs",
+    "peterpansflight":                              "mk_peter_pan",
+    "undertheseajourneyofthelittlemermaid":         "mk_little_mermaid",
+    "themanyadventuresofwinniethepooh":             "mk_winnie_pooh",
+    "itsasmallworld":                               "mk_small_world",
+    "dumbotheflyingelephant":                       "mk_dumbo",
+    "enchantedtaleswithbelle":                      "mk_enchanted_tales",
+    "mickeysphilharmagic":                          "mk_philharmagic",
+    "tronlightcyclerun":                            "mk_tron",
+    "spacemountain":                                "mk_space_mountain",
+    "buzzlightyearsspacerangerspin":                "mk_buzz_lightyear",
+    "monstersinclaughfloor":                        "mk_laugh_floor",
+    "piratesofthecaribbean":                        "mk_pirates",
+    "junglecruise":                                 "mk_jungle_cruise",
+    "themagiccarpetsofaladdin":                     "mk_magic_carpets",
+    "waltdisneysenchantedtikiroom":                 "mk_tiki_room",
+    "hauntedmansion":                               "mk_haunted_mansion",
+    "thehallofpresidents":                          "mk_hall_presidents",
+    "bigthundermountainrailroad":                   "mk_big_thunder",
+    "tianasbayouadventure":                         "mk_tianas_bayou",
+    "countrybearjamboree":                          "mk_country_bears",
+    "guardiansofthegalaxycosmicrewind":             "ep_guardians",
+    "testtrack":                                    "ep_test_track",
+    "missionspace":                                 "ep_mission_space",
+    "soarinaroundtheworld":                         "ep_soarin",
+    "livingwiththeland":                            "ep_living_land",
+    "theseaswithnemofriends":                       "ep_nemo_seas",
+    "turtletalkwithcrush":                          "ep_turtle_talk",
+    "spaceshipearth":                               "ep_spaceship_earth",
+    "journeyintoimaginationwithfigment":            "ep_figment",
+    "remysratatouilleadventure":                    "ep_remy",
+    "frozeneverafter":                              "ep_frozen",
+    "granfiestatourstarringthethreecaballeros":     "ep_gran_fiesta",
+    "reflectionsofchina":                           "ep_reflections_china",
+    "starwarsriseoftheresistance":                  "hs_rise_resistance",
+    "millenniumfalconsmugglersrun":                 "hs_smugglers_run",
+    "slinkydogdash":                                "hs_slinky_dog",
+    "toystorymania":                                "hs_toy_story_mania",
+    "alienswirlingsaucers":                         "hs_alien_saucers",
+    "thetwilightzonetowerofterror":                 "hs_tower_of_terror",
+    "rocknrollercoasterstarringaerosmith":          "hs_rock_n_roller",
+    "mickeyminniesrunawayrailway":                  "hs_runaway_railway",
+    "startourstheadventurescontinue":               "hs_star_tours",
+    "muppetvisiond":                                "hs_muppets",
+    "indianajonesepicstuntspectacular":             "hs_indiana_jones",
+    "fantasmic":                                    "hs_fantasmic",
+    "beautyandthebeastliveonstage":                 "hs_beauty_beast_show",
+    "avatarflightofpassage":                        "ak_flight_of_passage",
+    "naviriverjourney":                             "ak_navi_river",
+    "kilimanjarosafaris":                           "ak_kilimanjaro",
+    "festivalofthelionking":                        "ak_lion_king",
+    "gorillafallsexplorationtrail":                 "ak_gorilla_falls",
+    "expeditioneverestlegendoftheforbiddenmountain":"ak_expedition_everest",
+    "kaliriverrapids":                              "ak_kali_rapids",
+    "maharajahjungletrek":                          "ak_maharajah_trek",
+    "itstoughtobeabug":                             "ak_tough_bug",
+    "dinosaur":                                     "ak_dinosaur",
+    "triceratopspin":                               "ak_triceratop_spin",
+}
+
+_LOCAL_TO_LAND = {a.id: a.land for a in ALL_DISNEY_ATTRACTIONS}
+_LOCAL_TO_NAME = {a.id: a.name for a in ALL_DISNEY_ATTRACTIONS}
+
+DISNEY_SLUG_TO_LAND: dict[str, str] = {
+    slug: _LOCAL_TO_LAND.get(local_id, "mk_main_street")
+    for slug, local_id in DISNEY_SCRAPE_SLUG_MAP.items()
+}
+DISNEY_SLUG_TO_NAME: dict[str, str] = {
+    slug: _LOCAL_TO_NAME.get(local_id, slug.replace("_", " ").title())
+    for slug, local_id in DISNEY_SCRAPE_SLUG_MAP.items()
+}
+
+
+# ─── Refurbishment / reopening events ─────────────────────────────────────────
+# These affect wait time predictions and attraction availability.
+
+@dataclass
+class RefurbEvent:
+    status: str       # "just_opened" | "major_update"
+    reopen_date: date # when the ride opened / content changed
+    multiplier: float # peak wait-time multiplier on reopen_date
+    days_elevated: int # days over which multiplier tapers back to 1.0
+    note: str
+
+
+def refurb_factor(event: RefurbEvent, visit_date: date) -> float:
+    """Linear-taper multiplier: full on reopen_date, 1.0 at days_elevated."""
+    days_since = (visit_date - event.reopen_date).days
+    if days_since < 0 or days_since >= event.days_elevated:
+        return 1.0
+    fraction_remaining = 1.0 - days_since / event.days_elevated
+    return 1.0 + (event.multiplier - 1.0) * fraction_remaining
+
+
+REFURB_EVENTS: dict[str, RefurbEvent] = {
+    # Mandalorian & Grogu mission opened May 22, 2026 — Unreal Engine visuals,
+    # completely new storyline. Functionally a new ride. Passholder previews sold out.
+    "hs_smugglers_run": RefurbEvent(
+        status="major_update",
+        reopen_date=date(2026, 5, 22),
+        multiplier=2.5,
+        days_elevated=45,
+        note="New Mandalorian & Grogu mission with Unreal Engine visuals. Treat as new ride opening.",
+    ),
+    # Big Thunder reopened May 3, 2026 after track/Rainbow Caverns refurb.
+    "mk_big_thunder": RefurbEvent(
+        status="just_opened",
+        reopen_date=date(2026, 5, 3),
+        multiplier=1.25,
+        days_elevated=21,
+        note="Post-refurb: new track sections and Rainbow Caverns scene beside lift hill.",
+    ),
+}
+
+# Attractions unavailable before their reopen_date.
+# If visit_date < reopen_date, the ride is closed — show as unavailable.
+TEMPORARILY_CLOSED: dict[str, date] = {
+    "hs_rock_n_roller": date(2026, 5, 26),  # Muppets Coaster opens May 26; closed May 25
+    "ep_soarin":        date(2026, 5, 26),  # Soarin' Across America opens May 26; film switch May 25
+}
