@@ -27,7 +27,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.ensemble import HistGradientBoostingRegressor, GradientBoostingRegressor
 from sklearn.metrics import mean_absolute_error
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -174,13 +174,18 @@ def main():
     if not park_df.empty:
         Xp = park_df[PARK_FEATURE_NAMES]
         yp = park_df["__target"]
+        # Weight high-wait observations more so the model learns peak behaviour,
+        # not just average behaviour. sqrt scaling avoids extreme emphasis.
+        sw_park = np.sqrt(yp / yp.mean())
         log.info("Stage 1: fitting park_model on %d rows…", len(Xp))
-        park_model = GradientBoostingRegressor(
-            n_estimators=400, max_depth=4, learning_rate=0.05, random_state=42
+        park_model = HistGradientBoostingRegressor(
+            max_iter=600, max_depth=6, learning_rate=0.05,
+            min_samples_leaf=20, l2_regularization=0.5,
+            random_state=42,
         )
-        park_model.fit(Xp, yp)
+        park_model.fit(Xp, yp, sample_weight=sw_park)
         mae_park = mean_absolute_error(yp, park_model.predict(Xp))
-        log.info("  park_model in-sample MAE: %.2f min  (this is the 'expected mature park rolling avg')", mae_park)
+        log.info("  park_model in-sample MAE: %.2f min", mae_park)
     else:
         log.warning("Stage 1 skipped — no park data. Stage 2 will run without park_avg_pred feature.")
 
@@ -192,11 +197,16 @@ def main():
 
     Xr_train = train_df[RIDE_FEATURE_NAMES]
     yr_train = train_df["__target"]
-    log.info("Stage 2: fitting ride_model on %d Epic rows…", len(Xr_train))
-    ride_model = GradientBoostingRegressor(
-        n_estimators=600, max_depth=5, learning_rate=0.05, random_state=42
+    # Weight high-wait rows more so the model doesn't collapse to a smooth average.
+    # sqrt(wait/mean) gives ~2x weight to 100-min waits vs 25-min waits.
+    sw_ride = np.sqrt(yr_train / yr_train.mean())
+    log.info("Stage 2: fitting ride_model on %d Epic rows (weighted by sqrt(wait/mean))…", len(Xr_train))
+    ride_model = HistGradientBoostingRegressor(
+        max_iter=800, max_depth=7, learning_rate=0.04,
+        min_samples_leaf=15, l2_regularization=0.3,
+        random_state=42,
     )
-    ride_model.fit(Xr_train, yr_train)
+    ride_model.fit(Xr_train, yr_train, sample_weight=sw_ride)
     log.info("  ride_model in-sample MAE: %.2f min", mean_absolute_error(yr_train, ride_model.predict(Xr_train)))
 
     if not test_df.empty:
@@ -216,6 +226,19 @@ def main():
         for tier, grp in test_df.groupby("ride_tier"):
             mae_tier = mean_absolute_error(grp["__target"], grp["__pred"])
             log.info("    tier %d: n=%d  MAE=%.2f min  mean_actual=%.1f", int(tier), len(grp), mae_tier, grp["__target"].mean())
+
+        # Check peak vs quiet day accuracy
+        test_df["__crowd"] = test_df["crowd_base_mult"]
+        q75 = test_df["__crowd"].quantile(0.75)
+        q25 = test_df["__crowd"].quantile(0.25)
+        peak = test_df[test_df["__crowd"] >= q75]
+        quiet = test_df[test_df["__crowd"] <= q25]
+        log.info("  Peak days (crowd top quartile): MAE=%.2f  mean_actual=%.1f  mean_pred=%.1f",
+                 mean_absolute_error(peak["__target"], peak["__pred"]),
+                 peak["__target"].mean(), peak["__pred"].mean())
+        log.info("  Quiet days (crowd bottom quartile): MAE=%.2f  mean_actual=%.1f  mean_pred=%.1f",
+                 mean_absolute_error(quiet["__target"], quiet["__pred"]),
+                 quiet["__target"].mean(), quiet["__pred"].mean())
 
     MODEL_OUT.parent.mkdir(parents=True, exist_ok=True)
     bundle = {

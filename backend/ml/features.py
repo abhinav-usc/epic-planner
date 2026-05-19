@@ -36,6 +36,8 @@ PARK_FEATURE_NAMES: list[str] = [
     "holiday_mult",
     "crowd_base_mult",
     "hour_mult",
+    "crowd_x_hour",       # crowd_base_mult × hour_mult — captures multiplicative peak effect
+    "log_crowd_base",     # log scale helps tree models split crowd levels more evenly
 ]
 
 
@@ -44,6 +46,8 @@ def build_park_feature_row(when: datetime) -> dict:
     d = when.date()
     f = forecast_for(d)
     hol_mult, hol_label = holiday_factor(d)
+    import math
+    h_mult = hourly_factor(when.hour)
     return {
         "hour": when.hour,
         "minute_bucket": (when.minute // 15) * 15,
@@ -53,13 +57,16 @@ def build_park_feature_row(when: datetime) -> dict:
         "is_holiday": int(hol_label is not None),
         "holiday_mult": hol_mult,
         "crowd_base_mult": f.base_multiplier,
-        "hour_mult": hourly_factor(when.hour),
+        "hour_mult": h_mult,
+        "crowd_x_hour": f.base_multiplier * h_mult,
+        "log_crowd_base": math.log(max(f.base_multiplier, 0.1)),
     }
 
 
-# Per-ride features: everything in park features + ride attributes +
-# the park-model's predicted park_avg as a borrowed-strength input.
-RIDE_FEATURE_NAMES: list[str] = PARK_FEATURE_NAMES + [
+# Per-ride features for FL parks (Epic Universe + WDW):
+# Park features + ride attributes + park_avg_pred (borrowed strength from park_model).
+# Used when the calling park is in Orlando and we want to leverage cross-park calendar averages.
+RIDE_FEATURE_NAMES_FL: list[str] = PARK_FEATURE_NAMES + [
     "novelty_mult",
     "ride_tier",
     "capacity_per_hour",
@@ -69,7 +76,18 @@ RIDE_FEATURE_NAMES: list[str] = PARK_FEATURE_NAMES + [
     "has_single_rider",
     "early_entry",
     "park_avg_pred",
+    "crowd_x_tier",       # crowd_base_mult × ride_tier — high-tier rides amplify more on busy days
+    "crowd_x_cap_inv",    # crowd_base_mult / log(capacity+1) — low capacity + high crowd = long waits
 ]
+
+# Per-ride features for CA parks (Disneyland):
+# Same as FL but WITHOUT park_avg_pred. Disneyland has ~10+ years of dense per-ride
+# data so the ride model learns calendar/holiday effects directly from per-ride rows,
+# without needing borrowed-strength from a regional park-average model.
+RIDE_FEATURE_NAMES_CA: list[str] = [f for f in RIDE_FEATURE_NAMES_FL if f != "park_avg_pred"]
+
+# Back-compat alias (old code imports RIDE_FEATURE_NAMES).
+RIDE_FEATURE_NAMES = RIDE_FEATURE_NAMES_FL
 
 
 def build_ride_feature_row(
@@ -78,10 +96,13 @@ def build_ride_feature_row(
     early_entry: bool = False,
     park_avg_pred: float = 0.0,
 ) -> dict:
+    import math
     row = build_park_feature_row(when)
     d = when.date()
     open_hour = 8 if early_entry else 9
     close_hour = 22
+    crowd = row["crowd_base_mult"]
+    cap = a.capacity_per_hour or 500
     row.update({
         "novelty_mult": novelty_factor(d),
         "ride_tier": a.tier,
@@ -92,6 +113,8 @@ def build_ride_feature_row(
         "has_single_rider": int(a.has_single_rider),
         "early_entry": int(early_entry),
         "park_avg_pred": float(park_avg_pred),
+        "crowd_x_tier": crowd * a.tier,
+        "crowd_x_cap_inv": crowd / math.log(cap + 1),
     })
     return row
 

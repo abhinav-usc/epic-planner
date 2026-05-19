@@ -17,12 +17,24 @@ from typing import Iterator, Optional
 
 
 def find_heatmap_in_html(html: str) -> Optional[dict]:
-    """Return the first Plotly heatmap trace dict in the page, or None."""
-    # Find every Plotly.newPlot/react call. The data argument is `[ { ... } ]`.
+    """Return the best Plotly heatmap trace dict from the page, or None.
+
+    thrill-data embeds two heatmaps per page:
+      - A 5-minute-bucket raw poll heatmap (x_len ≈ 170) sourced from
+        queue-times.com — this one is capped at ~23 min for popular LL rides.
+      - An hourly-aggregated summary heatmap (x_len ≤ 24) built from
+        thrill-data's own aggregation — this is the one with real wait values.
+
+    We prefer the hourly heatmap (x_len ≤ 24).  If multiple hourly heatmaps
+    exist, take the one with the most data cells.  Fall back to the last
+    heatmap found if none has an hourly x-axis.
+    """
+    candidates: list[dict] = []  # (x_len, cell_count, trace)
+
     for m in re.finditer(
         r'Plotly\.(?:newPlot|react)\s*\(\s*"[^"]+"\s*,\s*(\[)', html
     ):
-        start = m.end() - 1   # index of the opening "["
+        start = m.end() - 1
         depth = 0
         in_str = False
         esc = False
@@ -55,8 +67,23 @@ def find_heatmap_in_html(html: str) -> Optional[dict]:
             continue
         for trace in traces:
             if isinstance(trace, dict) and trace.get("type") == "heatmap":
-                return trace
-    return None
+                x = trace.get("x") or []
+                z = trace.get("z") or []
+                cell_count = sum(
+                    1 for row in z for v in row
+                    if v not in (None, "", "null")
+                )
+                candidates.append((len(x), cell_count, trace))
+
+    if not candidates:
+        return None
+
+    # Prefer hourly (x_len ≤ 24); among those take the one with most cells.
+    hourly = [(xl, cc, t) for xl, cc, t in candidates if xl <= 24]
+    if hourly:
+        return max(hourly, key=lambda item: item[1])[2]
+    # Fallback: return the last heatmap found.
+    return candidates[-1][2]
 
 
 def hour_label_to_24(label: str) -> Optional[int]:

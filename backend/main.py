@@ -3,6 +3,8 @@ Epic Universe Day Planner — FastAPI entrypoint.
 
 Run from repo root:
     uvicorn backend.main:app --reload --port 8000
+
+In production the compiled frontend lives at /app/frontend/dist.
 """
 from __future__ import annotations
 
@@ -15,7 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from backend.routers import attractions, crowd, predictions, optimization, ai, data_refresh
+from backend.routers import attractions, crowd, predictions, optimization, ai, data_refresh, history, ll, live
 from backend.routers import ll_monitor
 
 
@@ -30,10 +32,9 @@ async def lifespan(app: FastAPI):
     yield
     task.cancel()
 
-
 app = FastAPI(
-    title="Epic Universe Planner",
-    description="Plan your day at Epic Universe. Wait times, optimization, AI helpers.",
+    title="Orlando Trip Planner",
+    description="Plan your day at all Orlando theme parks. Wait times, optimization, AI helpers.",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -41,7 +42,10 @@ app = FastAPI(
 # Local dev: Vite serves on 5173 by default.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:5173", "http://127.0.0.1:5173",
+        "http://localhost:5174", "http://127.0.0.1:5174",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -55,6 +59,9 @@ app.include_router(optimization.router)
 app.include_router(ai.router)
 app.include_router(data_refresh.router)
 app.include_router(ll_monitor.router)
+app.include_router(history.router)
+app.include_router(ll.router)
+app.include_router(live.router)
 
 
 @app.get("/api/health")

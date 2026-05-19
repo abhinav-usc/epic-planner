@@ -18,21 +18,38 @@ from typing import Optional
 
 # ─── Day-type multipliers ─────────────────────────────────────────────────────
 
-# Day of week relative to park average (Mon–Sun 0–6)
+# Day of week relative to park average (Mon–Sun 0–6).
+# Calibrated from 361 days of actual Epic Universe wait data.
+# Year-1 novelty keeps all days busier than a mature park; the weekday/weekend
+# spread is narrower than Disney/Universal norms but still present.
 DOW_MULTIPLIER = {
-    0: 1.05,   # Mon — light unless holiday
-    1: 0.85,   # Tue
-    2: 0.85,   # Wed
-    3: 0.95,   # Thu
-    4: 1.15,   # Fri
-    5: 1.40,   # Sat (peak)
-    6: 1.30,   # Sun
+    0: 1.03,   # Mon
+    1: 1.02,   # Tue
+    2: 1.02,   # Wed
+    3: 0.99,   # Thu
+    4: 0.99,   # Fri
+    5: 1.03,   # Sat
+    6: 0.92,   # Sun (checkout day — guests leave, waits softer)
 }
 
-# Month seasonality (Jan-Dec → multiplier)
+# Month seasonality (Jan-Dec → multiplier).
+# Derived from actual per-month averages in the historical CSV, normalised so
+# the geometric mean ≈ 1.0, then blended with expected mature-park seasonality.
+# May 2025 includes the opening-week ramp-up so it reads low in data; for
+# future May dates we expect normal summer-onset demand.
 MONTH_MULTIPLIER = {
-    1: 0.80, 2: 0.85, 3: 1.15, 4: 1.10, 5: 1.15, 6: 1.30,
-    7: 1.40, 8: 1.20, 9: 0.85, 10: 1.05, 11: 1.10, 12: 1.45,
+    1: 1.14,   # Jan — post-holiday peak (highest in data: 52.5 min avg)
+    2: 1.16,   # Feb — school holiday + Valentine crowds
+    3: 0.95,   # Mar — spring break starts mid-month
+    4: 0.92,   # Apr — lighter after spring break
+    5: 0.90,   # May — pre-summer; data low due to opening novelty ramp-up
+    6: 1.10,   # Jun — summer onset
+    7: 1.10,   # Jul — peak summer
+    8: 1.00,   # Aug — summer winding down
+    9: 1.00,   # Sep — shoulder season
+    10: 1.10,  # Oct — Halloween events, Canadian Thanksgiving
+    11: 0.97,  # Nov — quiet before Thanksgiving
+    12: 0.98,  # Dec — builds toward Christmas; Christmas week handled by holiday window
 }
 
 
@@ -112,21 +129,23 @@ def novelty_factor(d: date) -> float:
 # day-shape ratios at Universal/Disney parks).
 
 HOURLY_SHAPE = {
-    8:  0.45,  # early entry (limited guests)
-    9:  0.95,  # rope drop (line still building)
-    10: 1.15,
-    11: 1.35,  # busiest standby
-    12: 1.25,
-    13: 1.10,
-    14: 1.00,
-    15: 1.05,
-    16: 1.20,
-    17: 1.30,  # 2nd peak (dinner + lingering)
-    18: 1.20,
-    19: 1.00,
-    20: 0.80,
-    21: 0.55,  # closing approach
-    22: 0.35,
+    7:  0.32,  # pre-open / early entry trickle
+    8:  0.47,  # early entry (calibrated from data: 21.7 / 46.2)
+    9:  0.78,  # rope-drop rush still building (data: 35.8 / 46.2)
+    10: 1.14,  # crowds pour in (data: 52.7 / 46.2)
+    11: 1.39,  # single busiest hour (data: 64.0 / 46.2)
+    12: 1.33,  # lunch crowds stay high — interpolated 11/13
+    13: 1.27,  # data: 58.8 / 46.2
+    14: 1.23,  # data: 56.9 / 46.2
+    15: 1.23,  # data: 56.8 / 46.2
+    16: 1.19,  # data: 54.9 / 46.2
+    17: 1.10,  # data: 50.8 / 46.2 (no strong 2nd peak in Epic data)
+    18: 0.98,  # data: 45.3 / 46.2
+    19: 0.87,  # data: 40.0 / 46.2
+    20: 0.74,  # data: 34.2 / 46.2
+    21: 0.57,  # data: 26.3 / 46.2
+    22: 0.43,  # data: 20.0 / 46.2
+    23: 0.42,  # closing stragglers
 }
 
 

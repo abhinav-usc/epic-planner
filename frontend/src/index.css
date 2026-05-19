@@ -8,16 +8,64 @@
   --space-3: 8px;
   --space-4: 12px;
   --space-5: 16px;
+
+  /* ── Dark theme (default) ── pure black, no purple */
+  --bg-base:  #0A0A0A;
+  --bg-panel: #111111;
+  --bg-card:  #181818;
+  --bg-hover: #212121;
+
+  --ink-primary:   #F0F0F0;
+  --ink-secondary: #8C8C8C;
+  --ink-muted:     #505050;
+
+  --border-subtle: rgba(255, 255, 255, 0.07);
+
+  /* Status colours — pastel on dark backgrounds */
+  --status-ok:      #34D399;   /* emerald-400 */
+  --status-ok-bg:   rgba(16, 185, 129, 0.15);
+  --status-warn:    #FBBF24;   /* amber-400 */
+  --status-warn-bg: rgba(245, 158, 11, 0.15);
+  --status-bad:     #F87171;   /* red-400 */
+  --status-bad-bg:  rgba(239, 68, 68, 0.15);
+
+  --scrollbar-thumb:       #2A2A2A;
+  --scrollbar-thumb-hover: #404040;
+}
+
+:root.light {
+  /* ── Light theme ── */
+  --bg-base:  #E8E8E8;
+  --bg-panel: #F5F5F5;
+  --bg-card:  #FFFFFF;
+  --bg-hover: #E0E0E0;
+
+  --ink-primary:   #111111;
+  --ink-secondary: #4A4A4A;
+  --ink-muted:     #909090;
+
+  --border-subtle: rgba(0, 0, 0, 0.10);
+
+  /* Status colours — saturated on light backgrounds */
+  --status-ok:      #047857;   /* emerald-700 */
+  --status-ok-bg:   rgba(16, 185, 129, 0.12);
+  --status-warn:    #B45309;   /* amber-700 */
+  --status-warn-bg: rgba(245, 158, 11, 0.12);
+  --status-bad:     #B91C1C;   /* red-700 */
+  --status-bad-bg:  rgba(239, 68, 68, 0.12);
+
+  --scrollbar-thumb:       #C8C8C8;
+  --scrollbar-thumb-hover: #AAAAAA;
 }
 
 @layer base {
   html, body, #root {
     height: 100%;
-    background: theme(colors.bg.base);
+    background: var(--bg-base);
+    color: var(--ink-primary);
   }
   body {
     font-family: theme(fontFamily.sans);
-    color: theme(colors.ink.primary);
     font-weight: 400;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -25,26 +73,40 @@
   ::selection {
     background: rgba(251, 191, 36, 0.30);
   }
-  /* Scrollbar styling */
   ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-track { background: theme(colors.bg.base); }
-  ::-webkit-scrollbar-thumb { background: theme(colors.bg.hover); border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: theme(colors.ink.muted); }
+  ::-webkit-scrollbar-track { background: var(--bg-base); }
+  ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+
+  /* Native form controls respect theme */
+  input, select, textarea {
+    color: var(--ink-primary);
+    background: var(--bg-card);
+    color-scheme: light dark;
+  }
+  :root.light input,
+  :root.light select,
+  :root.light textarea {
+    color-scheme: light;
+  }
+}
+
+@layer utilities {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 @layer components {
   .panel {
-    @apply bg-bg-panel border border-bg-hover;
+    @apply bg-bg-panel;
     border-radius: 8px;
-    border-width: 0.5px;
-    border-color: rgba(255, 255, 255, 0.06);
+    border: 0.5px solid var(--border-subtle);
   }
   .card {
     @apply bg-bg-card;
     border-radius: 4px;
-    border-width: 0.5px;
-    border-style: solid;
-    border-color: rgba(255, 255, 255, 0.05);
+    border: 0.5px solid var(--border-subtle);
   }
   .btn {
     @apply px-3 py-1 text-xs transition-colors;
@@ -52,25 +114,31 @@
     font-weight: 500;
   }
   .btn-primary {
-    @apply btn bg-accent text-bg-base hover:bg-amber-300;
+    @apply btn bg-accent text-bg-base font-medium hover:bg-amber-300;
   }
   .btn-ghost {
     @apply btn bg-bg-hover text-ink-primary hover:bg-bg-card;
+    border: 0.5px solid var(--border-subtle);
   }
   .chip {
-    @apply inline-flex items-center text-[10px];
+    @apply inline-flex items-center text-[11px];
     gap: var(--space-1);
-    padding: 2px 6px;
+    padding: 2px 7px;
     border-radius: 999px;
-    font-weight: 400;
+    font-weight: 500;
   }
+  /* Status chip helpers */
+  .chip-ok   { background: var(--status-ok-bg);   color: var(--status-ok); }
+  .chip-warn { background: var(--status-warn-bg);  color: var(--status-warn); }
+  .chip-bad  { background: var(--status-bad-bg);   color: var(--status-bad); }
+
   .section-label {
-    @apply text-[10px] text-ink-secondary;
+    @apply text-[11px] text-ink-secondary;
     font-weight: 500;
     letter-spacing: 0.5px;
   }
   .row-item {
-    padding: var(--space-1) var(--space-2);
-    margin-bottom: 2px;
+    padding: var(--space-2) var(--space-3);
+    margin-bottom: 3px;
   }
 }

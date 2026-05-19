@@ -1,0 +1,29 @@
+# Version control
+.git/
+.gitignore
+
+# Python artifacts
+.venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+.pytest_cache/
+
+# Frontend source (only need the built dist)
+frontend/node_modules/
+# (frontend/src is needed for the build stage — don't exclude it)
+
+# Large training-only data file
+data/disney_waits.csv
+data/td_scrape_progress.txt
+data/td_parks_progress.txt
+
+# Scraping scripts (not needed at runtime)
+scripts/
+
+# Local dev + editor artifacts
+.DS_Store
+.env
+.env.*
+.claude/
+*.log

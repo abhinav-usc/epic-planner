@@ -14,17 +14,22 @@ export default {
           dark: "#9333EA",
         },
         bg: {
-          base: "#0B0B12",
-          panel: "#13131D",
-          card: "#1A1A26",
-          hover: "#22222F",
+          base: "var(--bg-base)",
+          panel: "var(--bg-panel)",
+          card: "var(--bg-card)",
+          hover: "var(--bg-hover)",
         },
         ink: {
-          primary: "#E8E8F0",
-          secondary: "#9999AE",
-          muted: "#5E5E72",
+          primary: "var(--ink-primary)",
+          secondary: "var(--ink-secondary)",
+          muted: "var(--ink-muted)",
         },
         accent: "#FBBF24",  // amber for highlights
+        status: {
+          ok:   "var(--status-ok)",
+          warn: "var(--status-warn)",
+          bad:  "var(--status-bad)",
+        },
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
