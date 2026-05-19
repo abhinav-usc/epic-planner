@@ -163,7 +163,6 @@ function RideCard({
 export function LLMonitorPage() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [connState, setConnState] = useState<"connecting" | "live" | "error">("connecting");
-  const [refreshing, setRefreshing] = useState(false);
   const [notifPerm, setNotifPerm] = useState<NotificationPermission>(
     typeof Notification !== "undefined" ? Notification.permission : "denied"
   );
@@ -182,17 +181,6 @@ export function LLMonitorPage() {
       saveThresholds(next);
       return next;
     });
-  }
-
-  async function forceRefresh() {
-    setRefreshing(true);
-    try {
-      const res = await fetch("/api/ll/status?force=true");
-      const data: Snapshot = await res.json();
-      setSnapshot(data);
-    } catch {/* ignore */} finally {
-      setRefreshing(false);
-    }
   }
 
   async function requestNotifs() {
@@ -279,6 +267,18 @@ export function LLMonitorPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notifPerm]);
 
+  // Force-refresh every 30s regardless of SSE cache
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/ll/status?force=true");
+        const data: Snapshot = await res.json();
+        setSnapshot(data);
+      } catch {/* ignore */}
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
   const rides = snapshot?.rides ?? {};
   const fetchedAt = snapshot?.fetchedAt
     ? new Date(snapshot.fetchedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" })
@@ -292,22 +292,12 @@ export function LLMonitorPage() {
           <h1 className="font-display text-2xl font-bold text-ink-primary">⚡ LL Monitor</h1>
           <p className="text-ink-muted text-sm mt-0.5">Disneyland · checks every 30s</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={forceRefresh}
-            disabled={refreshing}
-            className="text-xs text-ink-muted hover:text-ink-primary transition-colors disabled:opacity-40"
-            title="Force refresh"
-          >
-            {refreshing ? "⟳ …" : "⟳ Refresh"}
-          </button>
-          <div className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${
-              connState === "live" ? "bg-emerald-400 animate-pulse" :
-              connState === "error" ? "bg-red-400" : "bg-amber-400 animate-pulse"
-            }`} />
-            <span className="text-xs text-ink-muted capitalize">{connState}</span>
-          </div>
+        <div className="flex items-center gap-1.5">
+          <span className={`w-2 h-2 rounded-full ${
+            connState === "live" ? "bg-emerald-400 animate-pulse" :
+            connState === "error" ? "bg-red-400" : "bg-amber-400 animate-pulse"
+          }`} />
+          <span className="text-xs text-ink-muted capitalize">{connState}</span>
         </div>
       </div>
 
