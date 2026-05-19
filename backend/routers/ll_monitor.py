@@ -132,7 +132,22 @@ async def _event_generator(q: asyncio.Queue) -> AsyncGenerator[str, None]:
             yield chunk
 
 
-@router.get("/stream")
+@router.get("/debug")
+async def debug_raw() -> dict:
+    """Return raw API response for the tracked rides — use to inspect field names."""
+    async with httpx.AsyncClient(timeout=20) as client:
+        r = await client.get(_LIVE_URL)
+        r.raise_for_status()
+        data = r.json()
+
+    results = {}
+    for item in data.get("liveData", []):
+        name_lower = item.get("name", "").lower()
+        for key in _TRACKED:
+            if key in name_lower:
+                results[key] = item  # full raw item
+                break
+    return {"raw": results, "totalItems": len(data.get("liveData", []))}
 async def sse_stream() -> StreamingResponse:
     """SSE stream – sends a new event every time the poller runs."""
     q: asyncio.Queue = asyncio.Queue(maxsize=4)
