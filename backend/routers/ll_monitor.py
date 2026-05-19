@@ -107,11 +107,17 @@ async def poll_loop() -> None:
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("/status")
-async def get_status() -> dict:
-    if _latest["fetchedAt"] is None:
+async def get_status(force: bool = False) -> dict:
+    if force or _latest["fetchedAt"] is None:
         try:
             snapshot = await _fetch()
             _latest.update(snapshot)
+            payload = json.dumps(_latest)
+            for q in list(_subscribers):
+                try:
+                    q.put_nowait(payload)
+                except asyncio.QueueFull:
+                    pass
         except Exception as exc:
             return {"rides": {}, "fetchedAt": None, "error": str(exc)}
     return _latest
