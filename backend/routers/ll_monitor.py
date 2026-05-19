@@ -1,11 +1,11 @@
 """
 Disneyland Lightning Lane monitor.
 
-Polls themeparks.wiki every 2 minutes for PAID_RETURN_TIME status on
-Big Thunder Mountain, Matterhorn, and Indiana Jones Adventure.
+Polls themeparks.wiki every 30 seconds for PAID_RETURN_TIME status.
 
 SSE stream: GET /api/ll/stream
 Snapshot:   GET /api/ll/status
+Debug:      GET /api/ll/debug
 """
 from __future__ import annotations
 
@@ -23,9 +23,7 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ll", tags=["ll-monitor"])
 
-# themeparks.wiki entity ID for Disneyland Park (California)
-_PARK_ID = "b7678dab-5544-48d5-8fdc-c1a0127cfbcd"
-_LIVE_URL = f"https://api.themeparks.wiki/v1/entity/{_PARK_ID}/live"
+_DESTINATIONS_URL = "https://api.themeparks.wiki/v1/destinations"
 _POLL_INTERVAL = 30  # seconds
 
 _TRACKED = {
@@ -35,14 +33,45 @@ _TRACKED = {
     "star tours": "Star Tours – The Adventures Continue",
 }
 
+# Resolved at first poll
+_park_live_url: str | None = None
+
 # Shared state
 _latest: dict = {"rides": {}, "fetchedAt": None}
 _subscribers: list[asyncio.Queue] = []
 
 
-async def _fetch() -> dict:
+async def _resolve_park_url() -> str:
+    """Walk the destinations list to find Disneyland Park (not California Adventure)."""
     async with httpx.AsyncClient(timeout=20) as client:
-        r = await client.get(_LIVE_URL)
+        r = await client.get(_DESTINATIONS_URL)
+        r.raise_for_status()
+        destinations = r.json().get("destinations", [])
+
+    for dest in destinations:
+        name = dest.get("name", "").lower()
+        if "disneyland" not in name and "anaheim" not in name:
+            continue
+        for park in dest.get("parks", []):
+            park_name = park.get("name", "").lower()
+            # Disneyland Park, not California Adventure
+            if "disneyland park" in park_name or (
+                "disneyland" in park_name and "california adventure" not in park_name
+            ):
+                park_id = park["id"]
+                log.info("Resolved Disneyland Park ID: %s (%s)", park_id, park.get("name"))
+                return f"https://api.themeparks.wiki/v1/entity/{park_id}/live"
+
+    raise RuntimeError("Could not find Disneyland Park in destinations list")
+
+
+async def _fetch() -> dict:
+    global _park_live_url
+    if _park_live_url is None:
+        _park_live_url = await _resolve_park_url()
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        r = await client.get(_park_live_url)
         r.raise_for_status()
         data = r.json()
 
@@ -57,15 +86,14 @@ async def _fetch() -> dict:
                 rides[key] = {
                     "name": item.get("name", _TRACKED[key]),
                     "status": item.get("status", "UNKNOWN"),
-                    "llState": ll.get("state"),            # AVAILABLE | TEMPORARILY_FULL | FINISHED | None
+                    "llState": ll.get("state"),
                     "returnStart": ll.get("returnStart"),
                     "returnEnd": ll.get("returnEnd"),
                     "price": (ll.get("price") or {}).get("amount"),
                     "waitMinutes": standby.get("waitTime"),
                 }
-                break  # stop checking other keys for this item
+                break
 
-    # Fill missing rides so frontend always gets all three keys
     for key, display in _TRACKED.items():
         if key not in rides:
             rides[key] = {
@@ -82,7 +110,6 @@ async def _fetch() -> dict:
 
 
 async def poll_loop() -> None:
-    """Background task started at app startup."""
     global _latest
     while True:
         try:
@@ -100,6 +127,7 @@ async def poll_loop() -> None:
             log.info("LL poll OK – %d subscriber(s)", len(_subscribers))
         except Exception as exc:
             log.warning("LL poll failed: %s", exc)
+            _park_live_url = None  # force re-resolve on next attempt
         await asyncio.sleep(_POLL_INTERVAL)
 
 
@@ -107,9 +135,7 @@ async def poll_loop() -> None:
 
 @router.get("/status")
 async def get_status() -> dict:
-    """Return the latest cached snapshot immediately."""
     if _latest["fetchedAt"] is None:
-        # First request before the poller has run – fetch inline
         try:
             snapshot = await _fetch()
             _latest.update(snapshot)
@@ -118,39 +144,44 @@ async def get_status() -> dict:
     return _latest
 
 
+@router.get("/debug")
+async def debug_destinations() -> dict:
+    """Show Disneyland-related destinations and park IDs from themeparks.wiki."""
+    async with httpx.AsyncClient(timeout=20) as client:
+        r = await client.get(_DESTINATIONS_URL)
+        r.raise_for_status()
+        data = r.json()
+
+    disney = []
+    for dest in data.get("destinations", []):
+        name = dest.get("name", "").lower()
+        if "disneyland" in name or "anaheim" in name:
+            disney.append({
+                "destination": dest.get("name"),
+                "id": dest.get("id"),
+                "parks": dest.get("parks", []),
+            })
+    return {
+        "resolvedParkUrl": _park_live_url,
+        "disneylandDestinations": disney,
+        "totalDestinations": len(data.get("destinations", [])),
+    }
+
+
 async def _event_generator(q: asyncio.Queue) -> AsyncGenerator[str, None]:
-    # Send the current state immediately on connect
     yield f"data: {json.dumps(_latest)}\n\n"
     try:
         while True:
             payload = await asyncio.wait_for(q.get(), timeout=30)
             yield f"data: {payload}\n\n"
     except asyncio.TimeoutError:
-        # Heartbeat so the connection stays alive through proxies
         yield ": heartbeat\n\n"
         async for chunk in _event_generator(q):
             yield chunk
 
 
-@router.get("/debug")
-async def debug_raw() -> dict:
-    """Return raw API response for the tracked rides — use to inspect field names."""
-    async with httpx.AsyncClient(timeout=20) as client:
-        r = await client.get(_LIVE_URL)
-        r.raise_for_status()
-        data = r.json()
-
-    results = {}
-    for item in data.get("liveData", []):
-        name_lower = item.get("name", "").lower()
-        for key in _TRACKED:
-            if key in name_lower:
-                results[key] = item  # full raw item
-                break
-    all_items = [{"name": i.get("name"), "id": i.get("id"), "keys": list(i.keys())} for i in data.get("liveData", [])]
-    return {"raw": results, "totalItems": len(data.get("liveData", [])), "allItems": all_items, "topLevelKeys": list(data.keys())}
+@router.get("/stream")
 async def sse_stream() -> StreamingResponse:
-    """SSE stream – sends a new event every time the poller runs."""
     q: asyncio.Queue = asyncio.Queue(maxsize=4)
     _subscribers.append(q)
 
@@ -169,6 +200,6 @@ async def sse_stream() -> StreamingResponse:
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",  # disable Nginx buffering
+            "X-Accel-Buffering": "no",
         },
     )
