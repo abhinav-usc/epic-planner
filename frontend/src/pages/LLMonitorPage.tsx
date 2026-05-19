@@ -100,12 +100,6 @@ function RideCard({ rideKey, ride }: { rideKey: string; ride: RideStatus }) {
             </span>
           </div>
         )}
-        {available && ride.price != null && (
-          <div className="flex flex-col">
-            <span className="text-ink-muted text-xs">Price</span>
-            <span className="text-ink-primary font-medium">${ride.price}</span>
-          </div>
-        )}
       </div>
     </div>
   );
