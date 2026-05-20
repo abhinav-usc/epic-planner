@@ -29,9 +29,6 @@ COPY backend/ ./backend/
 # Copy pre-built frontend into a static folder FastAPI will serve
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
-# Copy any scripts / data needed at runtime
-COPY scripts/ ./scripts/
-
 # Expose the port Fly will route to
 EXPOSE 8000
 
