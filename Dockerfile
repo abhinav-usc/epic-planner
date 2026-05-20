@@ -12,6 +12,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Install build tools needed by pywebpush / cryptography, then clean up
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libssl-dev \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install Python deps
 COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
