@@ -271,6 +271,28 @@ async def _welcome_push(device_id: str) -> None:
     log.info("Welcome push sent to %s", device_id[:8])
 
 
+async def _startup_push_all() -> None:
+    """Send a welcome push to all registered devices on server start.
+
+    Lets existing subscribers verify push still works after a deploy —
+    no need to clear localStorage or re-register.
+    """
+    delay = random.uniform(60, 150)
+    await asyncio.sleep(delay)
+    devices = list(_subscriptions.keys())
+    for device_id in devices:
+        watch = _subscriptions.get(device_id)
+        if not watch:
+            continue
+        park_name = _PARKS.get(watch.park, {}).get("name", "the park")
+        _send_push(
+            watch,
+            title="⚡ LL Monitor active",
+            body=f"Push notifications are working! Star rides on {park_name} to get alerted when LL opens or waits drop — even when the app is closed.",
+        )
+    log.info("Startup welcome push sent to %d device(s)", len(devices))
+
+
 def _check_and_push(watch: DeviceWatch, snapshot: dict) -> None:
     """Compare current snapshot against prev state; push if conditions changed."""
     rides = snapshot["rides"]
@@ -362,6 +384,8 @@ async def _poll_park(park_key: str) -> None:
 
 async def poll_loop() -> None:
     """Start all per-park poll loops concurrently (called from lifespan)."""
+    if _subscriptions:
+        asyncio.create_task(_startup_push_all())
     await asyncio.gather(*(_poll_park(pk) for pk in _PARKS))
 
 
