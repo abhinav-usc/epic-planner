@@ -46,23 +46,15 @@ _POLL_INTERVAL = 30  # seconds
 
 _VAPID_EMAIL = os.getenv("VAPID_EMAIL", "mailto:admin@example.com")
 _VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
-_VAPID_PRIVATE_PEM = os.getenv("VAPID_PRIVATE_KEY_PEM", "")
 
-# VAPID_PRIVATE_KEY_B64: the full PEM base64-encoded as a single line.
-# This avoids newline corruption in env vars without any ASN.1 reconstruction.
-_b64_pem = os.getenv("VAPID_PRIVATE_KEY_B64", "")
-if _b64_pem:
-    try:
-        _VAPID_PRIVATE_PEM = base64.b64decode(_b64_pem).decode()
-    except Exception as _e:
-        log.error("Failed to decode VAPID_PRIVATE_KEY_B64: %s", _e)
+# py_vapid's from_string() expects a base64url-encoded DER key (not PEM).
+# Store the key as VAPID_PRIVATE_KEY_DER (base64url of the raw DER bytes).
+_VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY_DER", "")
 
-# Load .env if keys are still missing (local dev convenience)
-if not _VAPID_PUBLIC_KEY or not _VAPID_PRIVATE_PEM:
+# Load .env for local dev if env vars not set
+if not _VAPID_PUBLIC_KEY or not _VAPID_PRIVATE_KEY:
     _env_path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
     if os.path.exists(_env_path):
-        _pem_lines: list[str] = []
-        _collecting_pem = False
         with open(_env_path) as _f:
             for _line in _f:
                 _line = _line.rstrip("\n")
@@ -70,37 +62,16 @@ if not _VAPID_PUBLIC_KEY or not _VAPID_PRIVATE_PEM:
                     _VAPID_EMAIL = _line[len("VAPID_EMAIL="):]
                 elif _line.startswith("VAPID_PUBLIC_KEY="):
                     _VAPID_PUBLIC_KEY = _line[len("VAPID_PUBLIC_KEY="):]
-                elif _line.startswith("VAPID_PRIVATE_KEY_RAW=") and not _raw_key:
-                    try:
-                        _VAPID_PRIVATE_PEM = _raw_b64url_to_pem(_line[len("VAPID_PRIVATE_KEY_RAW="):])
-                    except Exception as _e:
-                        log.error("Failed to decode VAPID_PRIVATE_KEY_RAW from .env: %s", _e)
-                elif _line.startswith("VAPID_PRIVATE_KEY_PEM="):
-                    _collecting_pem = True
-                    _pem_lines = [_line[len("VAPID_PRIVATE_KEY_PEM="):]]
-                elif _collecting_pem:
-                    _pem_lines.append(_line)
-                    if "-----END" in _line:
-                        _collecting_pem = False
-        if _pem_lines and not _VAPID_PRIVATE_PEM:
-            _VAPID_PRIVATE_PEM = "\n".join(_pem_lines)
+                elif _line.startswith("VAPID_PRIVATE_KEY_DER="):
+                    _VAPID_PRIVATE_KEY = _line[len("VAPID_PRIVATE_KEY_DER="):]
 
 if not _VAPID_PUBLIC_KEY:
     log.warning("VAPID_PUBLIC_KEY not set — Web Push disabled")
-if not _VAPID_PRIVATE_PEM:
-    log.warning("VAPID_PRIVATE_KEY_PEM not set — Web Push disabled")
+if not _VAPID_PRIVATE_KEY:
+    log.warning("VAPID_PRIVATE_KEY_DER not set — Web Push disabled")
 
-_PUSH_ENABLED = bool(_VAPID_PUBLIC_KEY and _VAPID_PRIVATE_PEM)
-
-if _PUSH_ENABLED:
-    _pem_header = _VAPID_PRIVATE_PEM[:27]  # "-----BEGIN EC PRIVATE KEY--" sans trailing -
-    log.info("VAPID push enabled. PEM starts: %r (len=%d)", _pem_header, len(_VAPID_PRIVATE_PEM))
-    try:
-        from cryptography.hazmat.primitives.serialization import load_pem_private_key as _lpk
-        _test_key = _lpk(_VAPID_PRIVATE_PEM.encode(), password=None)
-        log.info("VAPID PEM loads OK: %s", type(_test_key).__name__)
-    except Exception as _te:
-        log.error("VAPID PEM fails to load: %s", _te)
+_PUSH_ENABLED = bool(_VAPID_PUBLIC_KEY and _VAPID_PRIVATE_KEY)
+log.info("VAPID push %s (key len=%d)", "enabled" if _PUSH_ENABLED else "DISABLED", len(_VAPID_PRIVATE_KEY))
 
 # ── Park registry ──────────────────────────────────────────────────────────────
 
@@ -233,7 +204,7 @@ def _send_push(watch: DeviceWatch, title: str, body: str) -> None:
         webpush(
             subscription_info=watch.push_sub,
             data=json.dumps({"title": title, "body": body}),
-            vapid_private_key=_VAPID_PRIVATE_PEM,
+            vapid_private_key=_VAPID_PRIVATE_KEY,
             vapid_claims={"sub": _VAPID_EMAIL},
         )
         log.info("Push sent to %s: %s", watch.device_id[:8], title)
