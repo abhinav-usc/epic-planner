@@ -19,6 +19,7 @@ Routes:
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import json
 import logging
 import os
@@ -128,6 +129,33 @@ class DeviceWatch:
 
 _subscriptions: dict[str, DeviceWatch] = {}  # device_id → DeviceWatch
 
+_SUBS_PATH = os.getenv("SUBSCRIPTIONS_PATH", "/tmp/ll_subscriptions.json")
+
+
+def _save_subscriptions() -> None:
+    try:
+        with open(_SUBS_PATH, "w") as f:
+            json.dump({k: dataclasses.asdict(v) for k, v in _subscriptions.items()}, f)
+    except Exception as exc:
+        log.warning("Failed to save subscriptions: %s", exc)
+
+
+def _load_subscriptions() -> None:
+    try:
+        if not os.path.exists(_SUBS_PATH):
+            return
+        with open(_SUBS_PATH) as f:
+            data = json.load(f)
+        for item in data.values():
+            watch = DeviceWatch(**item)
+            _subscriptions[watch.device_id] = watch
+        log.info("Loaded %d push subscriptions from disk", len(_subscriptions))
+    except Exception as exc:
+        log.warning("Failed to load subscriptions: %s", exc)
+
+
+_load_subscriptions()
+
 
 def _ride_slug(name: str) -> str:
     s = re.sub(r"[^\w\s]", "", name.lower())
@@ -189,6 +217,7 @@ def _send_push(watch: DeviceWatch, title: str, body: str) -> None:
         if status in (404, 410):
             # Subscription expired — remove it
             _subscriptions.pop(watch.device_id, None)
+            _save_subscriptions()
             log.info("Removed expired subscription for %s", watch.device_id[:8])
         else:
             log.warning("Push failed for %s: %s", watch.device_id[:8], exc)
@@ -342,6 +371,7 @@ async def push_subscribe(req: PushSubscribeRequest) -> dict:
         initialized=existing.initialized if existing and existing.park == req.park else False,
     )
     _subscriptions[req.device_id] = watch
+    _save_subscriptions()
     log.info("Push subscription registered: %s → %s (%d watches)",
              req.device_id[:8], req.park, len(req.watches))
     return {"status": "ok", "park": req.park, "watches": len(req.watches)}
@@ -350,6 +380,8 @@ async def push_subscribe(req: PushSubscribeRequest) -> dict:
 @router.delete("/push-subscribe/{device_id}")
 async def push_unsubscribe(device_id: str) -> dict:
     removed = _subscriptions.pop(device_id, None)
+    if removed:
+        _save_subscriptions()
     return {"status": "removed" if removed else "not_found"}
 
 
