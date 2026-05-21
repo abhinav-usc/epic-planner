@@ -453,6 +453,23 @@ async def push_subscribe(req: PushSubscribeRequest) -> dict:
     return {"status": "ok", "park": req.park, "watches": len(req.watches)}
 
 
+@router.post("/push/test")
+async def push_test_all() -> dict:
+    """Send an immediate test push to every registered device."""
+    if not _PUSH_ENABLED:
+        raise HTTPException(status_code=503, detail="Push not configured")
+    sent = 0
+    for watch in list(_subscriptions.values()):
+        park_name = _PARKS.get(watch.park, {}).get("name", "the park")
+        _send_push(
+            watch,
+            title="⚡ LL Monitor active",
+            body=f"Push notifications are working! Watching {park_name}.",
+        )
+        sent += 1
+    return {"sent": sent}
+
+
 @router.delete("/push-subscribe/{device_id}")
 async def push_unsubscribe(device_id: str) -> dict:
     removed = _subscriptions.pop(device_id, None)
