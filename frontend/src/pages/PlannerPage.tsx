@@ -297,11 +297,11 @@ export function PlannerPage() {
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
     >
-      <div className="h-screen h-dvh flex flex-col overflow-hidden">
+      <div className="h-full flex flex-col overflow-hidden">
         <SettingsBar onShowHistory={() => setShowHistory(true)} />
 
         {/* Park selector tabs */}
-        <div className="flex items-center gap-0 border-b border-bg-hover bg-bg-panel shrink-0 overflow-x-auto px-2">
+        <div className="flex items-center gap-0 border-b border-bg-hover bg-bg-panel shrink-0 overflow-x-auto touch-pan-x px-2">
           {PARKS.map(p => (
             <button
               key={p.id}

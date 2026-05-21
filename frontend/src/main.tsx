@@ -17,12 +17,12 @@ function App() {
   }
 
   return (
-    <>
+    <div className="h-dvh flex flex-col overflow-hidden">
       {/* Top nav */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center gap-1 px-4 py-2 bg-bg-base/90 backdrop-blur border-b border-zinc-800/60">
+      <nav className="shrink-0 flex items-center gap-1 px-3 py-1.5 bg-bg-base/90 backdrop-blur border-b border-zinc-800/60 z-50">
         <button
           onClick={() => switchTab("planner")}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
             tab === "planner"
               ? "bg-accent/20 text-accent"
               : "text-ink-muted hover:text-ink-primary"
@@ -32,7 +32,7 @@ function App() {
         </button>
         <button
           onClick={() => switchTab("ll-monitor")}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
             tab === "ll-monitor"
               ? "bg-emerald-500/20 text-emerald-400"
               : "text-ink-muted hover:text-ink-primary"
@@ -42,11 +42,11 @@ function App() {
         </button>
       </nav>
 
-      {/* Page content – offset for nav */}
-      <div className="pt-10">
+      {/* Page content */}
+      <div className="flex-1 overflow-hidden flex flex-col">
         {tab === "planner" ? <PlannerPage /> : <LLMonitorPage />}
       </div>
-    </>
+    </div>
   );
 }
 

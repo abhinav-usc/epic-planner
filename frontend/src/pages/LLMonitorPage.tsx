@@ -157,7 +157,7 @@ function RideRow({
   const belowThreshold = pinned && threshold !== null && ride.waitMinutes !== null && ride.waitMinutes <= threshold;
 
   return (
-    <div className={`rounded-2xl border p-4 flex flex-col gap-3 transition-all duration-500 ${
+    <div className={`rounded-xl border p-3 flex flex-col gap-2 transition-all duration-500 ${
       pinned && llOpen
         ? "border-emerald-500/50 bg-emerald-950/30 shadow-[0_0_24px_rgba(16,185,129,0.12)]"
         : pinned && belowThreshold
@@ -468,13 +468,13 @@ export function LLMonitorPage() {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-bg-base px-4 py-8 max-w-xl mx-auto flex flex-col gap-5">
+    <div className="min-h-full bg-bg-base px-3 py-4 max-w-xl mx-auto flex flex-col gap-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-2xl font-bold text-ink-primary">⚡ LL Monitor</h1>
-          <p className="text-ink-muted text-sm mt-0.5">
-            {selectedPark.icon} {selectedPark.name} · checks every 30s
+          <h1 className="font-display text-lg font-bold text-ink-primary">⚡ LL Monitor</h1>
+          <p className="text-ink-muted text-xs mt-0.5">
+            {selectedPark.icon} {selectedPark.name} · every 30s
           </p>
         </div>
         <div className="flex items-center gap-1.5">
@@ -487,7 +487,7 @@ export function LLMonitorPage() {
       </div>
 
       {/* Park selector */}
-      <div className="flex gap-1 overflow-x-auto pb-1">
+      <div className="flex gap-1 overflow-x-auto pb-1 touch-pan-x">
         {PARKS.map((p) => (
           <button
             key={p.key}
@@ -539,9 +539,9 @@ export function LLMonitorPage() {
       )}
 
       {/* Ride list */}
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2">
         {!snapshot && (
-          <p className="text-center text-zinc-500 text-sm py-10">Connecting to live data…</p>
+          <p className="text-center text-zinc-500 text-sm py-8">Connecting to live data…</p>
         )}
         {snapshot?.error && (
           <p className="text-center text-red-400 text-sm py-4">Error: {snapshot.error}</p>
