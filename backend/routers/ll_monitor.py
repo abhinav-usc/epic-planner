@@ -92,6 +92,16 @@ if not _VAPID_PRIVATE_PEM:
 
 _PUSH_ENABLED = bool(_VAPID_PUBLIC_KEY and _VAPID_PRIVATE_PEM)
 
+if _PUSH_ENABLED:
+    _pem_header = _VAPID_PRIVATE_PEM[:27]  # "-----BEGIN EC PRIVATE KEY--" sans trailing -
+    log.info("VAPID push enabled. PEM starts: %r (len=%d)", _pem_header, len(_VAPID_PRIVATE_PEM))
+    try:
+        from cryptography.hazmat.primitives.serialization import load_pem_private_key as _lpk
+        _test_key = _lpk(_VAPID_PRIVATE_PEM.encode(), password=None)
+        log.info("VAPID PEM loads OK: %s", type(_test_key).__name__)
+    except Exception as _te:
+        log.error("VAPID PEM fails to load: %s", _te)
+
 # ── Park registry ──────────────────────────────────────────────────────────────
 
 _PARKS: dict[str, dict] = {
