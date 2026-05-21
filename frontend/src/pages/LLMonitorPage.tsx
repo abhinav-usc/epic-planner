@@ -355,7 +355,7 @@ export function LLMonitorPage() {
   // ── In-app notifications (when PWA is in foreground) ────────────────────────
 
   function notifyInApp(title: string, body: string) {
-    if (notifPerm !== "granted" || pushStatus === "active") return; // backend handles it when push active
+    if (notifPerm !== "granted") return;
     new Notification(title, { body, icon: "/favicon.ico" });
   }
 

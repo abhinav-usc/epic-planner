@@ -11,13 +11,20 @@ self.addEventListener("push", (event) => {
   } catch {
     body = event.data.text();
   }
+
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      icon: "/favicon.ico",
-      badge: "/favicon.ico",
-      tag: title, // collapse duplicates with the same title
-      renotify: false,
+    // If the app is open and visible, skip the system notification —
+    // the SSE stream fires in-app notifications directly.
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      const appVisible = list.some((c) => c.visibilityState === "visible");
+      if (appVisible) return;
+      return self.registration.showNotification(title, {
+        body,
+        icon: "/favicon.ico",
+        badge: "/favicon.ico",
+        tag: title,
+        renotify: false,
+      });
     })
   );
 });
