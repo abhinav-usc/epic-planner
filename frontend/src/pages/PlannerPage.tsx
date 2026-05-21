@@ -10,8 +10,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { IconRollercoaster, IconCalendarEvent, IconSparkles as IconOptimize } from "@tabler/icons-react";
-import { SettingsBar } from "../components/SettingsBar";
+import { IconRollercoaster, IconCalendarEvent, IconSparkles as IconOptimize, IconCalendar } from "@tabler/icons-react";
 import { LandSidebar } from "../components/LandSidebar";
 import { Timeline, PX_PER_MIN, BarPreview } from "../components/Timeline";
 import { OptimizePanel } from "../components/OptimizePanel";
@@ -298,11 +297,9 @@ export function PlannerPage() {
       onDragEnd={onDragEnd}
     >
       <div className="h-full flex flex-col overflow-hidden">
-        <SettingsBar onShowHistory={() => setShowHistory(true)} />
-
-        {/* Park selector tabs */}
+        {/* Park selector tabs + history button */}
         <div
-          className="flex items-center gap-0 border-b border-bg-hover bg-bg-panel shrink-0 overflow-x-auto px-1"
+          className="flex items-center border-b border-bg-hover bg-bg-panel shrink-0 overflow-x-auto px-1"
           style={{ touchAction: "pan-x", overflowY: "hidden" }}
         >
           {PARKS.map(p => (
@@ -310,7 +307,7 @@ export function PlannerPage() {
               key={p.id}
               onClick={() => { if (p.id !== currentPark) switchPark(p.id); }}
               className={clsx(
-                "flex items-center gap-1 px-2 py-1.5 text-[10px] font-medium whitespace-nowrap transition-colors shrink-0",
+                "flex items-center gap-1 px-2.5 py-2 text-[11px] font-medium whitespace-nowrap transition-colors shrink-0",
                 "border-b-2 -mb-px",
                 currentPark === p.id
                   ? "border-accent text-ink-primary"
@@ -322,6 +319,13 @@ export function PlannerPage() {
               <span className="sm:hidden">{p.short}</span>
             </button>
           ))}
+          <button
+            onClick={() => setShowHistory(true)}
+            className="shrink-0 ml-auto flex items-center gap-1 px-2 py-2 text-ink-muted hover:text-ink-secondary hover:bg-bg-hover transition-colors rounded"
+            title="Browse historical wait times"
+          >
+            <IconCalendar size={13} stroke={1.5} />
+          </button>
         </div>
 
         {refreshNote && (

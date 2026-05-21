@@ -109,9 +109,9 @@ export function OptimizePanel({ open, onToggle, mobileOpen }: OptimizePanelProps
             {mobileOpen && (
               <button
                 onClick={onToggle}
-                className="w-8 h-8 flex items-center justify-center rounded-md text-ink-muted hover:text-ink-primary hover:bg-bg-hover transition-colors shrink-0"
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-bg-hover text-ink-secondary hover:text-ink-primary transition-colors shrink-0"
               >
-                ✕
+                <IconX size={16} stroke={1.5} />
               </button>
             )}
           </div>
@@ -202,9 +202,9 @@ export function OptimizePanel({ open, onToggle, mobileOpen }: OptimizePanelProps
             {/* Food breaks */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-1 text-[10px] text-ink-secondary">
-                  <IconToolsKitchen2 size={11} stroke={1.5} />
-                  <span className="uppercase tracking-wider font-medium">Meal breaks</span>
+                <div className="flex items-center gap-1.5 text-xs text-ink-secondary">
+                  <IconToolsKitchen2 size={12} stroke={1.5} />
+                  <span className="font-medium">Meal breaks</span>
                 </div>
                 <button
                   onClick={addFoodBreak}
@@ -272,9 +272,9 @@ export function OptimizePanel({ open, onToggle, mobileOpen }: OptimizePanelProps
 
             {/* Shopping breaks */}
             <div>
-              <div className="flex items-center gap-1 mb-1.5 text-[10px] text-ink-secondary">
-                <IconShoppingBag size={11} stroke={1.5} />
-                <span className="uppercase tracking-wider font-medium">Shopping breaks</span>
+              <div className="flex items-center gap-1.5 mb-1.5 text-xs text-ink-secondary">
+                <IconShoppingBag size={12} stroke={1.5} />
+                <span className="font-medium">Shopping breaks</span>
               </div>
               <div className="space-y-1">
                 {LANDS.map(l => {
@@ -338,9 +338,9 @@ export function OptimizePanel({ open, onToggle, mobileOpen }: OptimizePanelProps
             {/* Lightning Lane — Disney parks only */}
             {isDisney && (
               <div>
-                <div className="flex items-center gap-1 mb-1.5 text-[10px] text-ink-secondary">
-                  <IconBolt size={11} stroke={1.5} />
-                  <span className="uppercase tracking-wider font-medium">Lightning Lane</span>
+                <div className="flex items-center gap-1.5 mb-1.5 text-xs text-ink-secondary">
+                  <IconBolt size={12} stroke={1.5} />
+                  <span className="font-medium">Lightning Lane</span>
                 </div>
                 <div className="space-y-1">
                   {/* LLMP toggle */}

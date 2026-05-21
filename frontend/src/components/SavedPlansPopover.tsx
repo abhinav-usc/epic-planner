@@ -73,6 +73,13 @@ export function SavedPlansPopover() {
     setTimeout(() => setSaved(false), 2000);
   }
 
+  const { currentPark } = usePlanner();
+
+  const PARK_SHORT: Record<string, string> = {
+    epic_universe: "EU", magic_kingdom: "MK", epcot: "EP",
+    hollywood_studios: "HS", animal_kingdom: "AK", disneyland: "DL",
+  };
+
   const fmtDate = new Date(targetDate + "T12:00:00").toLocaleDateString("en-US", {
     weekday: "short", month: "short", day: "numeric",
   });
@@ -88,7 +95,7 @@ export function SavedPlansPopover() {
             : "bg-bg-card text-ink-secondary hover:bg-bg-hover",
         )}
         style={{ borderWidth: "0.5px", borderColor: open ? "var(--accent)" : "var(--border-subtle)" }}
-        title="Save or load plans for this day"
+        title="Save or load plans for this park & day"
       >
         {plansForDate.length > 0
           ? <IconBookmarkFilled size={12} stroke={1.5} />
@@ -107,7 +114,7 @@ export function SavedPlansPopover() {
           {/* Save section */}
           <div className="p-3 border-b border-bg-hover">
             <div className="text-[10px] font-medium text-ink-secondary uppercase tracking-wider mb-2">
-              Save current plan · {fmtDate}
+              Save · {PARK_SHORT[currentPark] ?? currentPark} · {fmtDate}
             </div>
             {plannedItems.length === 0 ? (
               <p className="text-[11px] text-ink-muted">Add rides to the timeline first.</p>
@@ -143,7 +150,7 @@ export function SavedPlansPopover() {
             ) : (
               <>
                 <div className="px-3 pt-2 pb-1 text-[10px] font-medium text-ink-secondary uppercase tracking-wider">
-                  Saved for {fmtDate}
+                  {PARK_SHORT[currentPark] ?? currentPark} · {fmtDate}
                 </div>
                 <div className="max-h-52 overflow-y-auto">
                   {[...plansForDate].reverse().map(plan => (

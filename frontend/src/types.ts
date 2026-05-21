@@ -257,6 +257,7 @@ export interface LLPlanResponse {
 export interface SavedPlan {
   id: string;
   date: string;
+  park: string;          // ParkId — plans are scoped to park + date
   name: string;
   savedAt: string;       // ISO timestamp
   earlyEntry: boolean;

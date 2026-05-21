@@ -79,7 +79,7 @@ async function subscribeToPush(reg: ServiceWorkerRegistration): Promise<PushSubs
 
     return await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: publicKey, // base64url string — browsers accept this directly
+      applicationServerKey: publicKey,
     });
   } catch { return null; }
 }
@@ -123,20 +123,20 @@ function fmt12(iso: string | null): string {
 function LLBadge({ state }: { state: string | null }) {
   if (state === "AVAILABLE")
     return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
-        <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
         LL Open
       </span>
     );
   if (state === "TEMPORARILY_FULL")
     return (
-      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+      <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
         LL Full
       </span>
     );
   if (state === "FINISHED")
     return (
-      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-zinc-700/60 text-zinc-400 border border-zinc-600/30 shrink-0">
+      <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-zinc-700/60 text-zinc-400 border border-zinc-600/30 shrink-0">
         LL Done
       </span>
     );
@@ -155,70 +155,82 @@ function RideRow({
 }) {
   const llOpen = ride.llState === "AVAILABLE";
   const belowThreshold = pinned && threshold !== null && ride.waitMinutes !== null && ride.waitMinutes <= threshold;
+  const isDown = ride.status === "DOWN" || ride.status === "REFURBISHMENT" || ride.status === "CLOSED";
 
   return (
-    <div className={`rounded-lg border px-2.5 py-2 flex flex-col gap-1.5 transition-all duration-500 ${
+    <div className={`rounded-2xl border overflow-hidden transition-all duration-300 ${
       pinned && llOpen
-        ? "border-emerald-500/50 bg-emerald-950/30"
+        ? "border-emerald-500/40 bg-emerald-950/20"
         : pinned && belowThreshold
-        ? "border-sky-500/50 bg-sky-950/20"
+        ? "border-sky-500/40 bg-sky-950/20"
         : pinned
-        ? "border-amber-500/30 bg-zinc-900/70"
-        : "border-zinc-800/60 bg-zinc-900/20"
+        ? "border-amber-500/25 bg-zinc-900/80"
+        : "border-zinc-800/50 bg-zinc-900/30"
     }`}>
-      {/* Top row */}
-      <div className="flex items-center gap-2">
+      {/* Main row */}
+      <div className="flex items-stretch">
+        {/* Star button — full-height touch target */}
         <button
           onClick={onPinToggle}
-          className={`shrink-0 text-base leading-none transition-colors ${
-            pinned ? "text-amber-400" : "text-zinc-700 hover:text-zinc-400"
+          className={`w-12 flex items-center justify-center shrink-0 text-xl transition-all active:scale-90 ${
+            pinned
+              ? "text-amber-400 bg-amber-500/10"
+              : "text-zinc-700 hover:text-zinc-400"
           }`}
-          title={pinned ? "Unpin" : "Pin to watch"}
+          style={{ minHeight: 54 }}
+          aria-label={pinned ? "Unpin ride" : "Pin to watch"}
         >
           {pinned ? "★" : "☆"}
         </button>
 
-        <div className="flex-1 min-w-0">
-          <p className={`font-medium text-[13px] leading-tight truncate ${
-            ride.status !== "OPERATING" && ride.status !== "UNKNOWN" ? "text-zinc-500" : "text-ink-primary"
+        {/* Name + status */}
+        <div className="flex-1 min-w-0 py-3 pl-0.5">
+          <p className={`font-semibold text-sm leading-tight truncate pr-2 ${
+            isDown ? "text-zinc-500" : "text-zinc-100"
           }`}>{ride.name}</p>
-          <p className={`text-[10px] ${
-            ride.status === "OPERATING" ? "text-emerald-400" :
+          <p className={`text-xs mt-0.5 ${
+            ride.status === "OPERATING" ? "text-emerald-500" :
             ride.status === "DOWN" ? "text-red-400" :
             ride.status === "REFURBISHMENT" ? "text-amber-400" :
             "text-zinc-600"
-          }`}>{ride.status}</p>
+          }`}>{ride.status.replace("_", " ")}</p>
         </div>
 
-        {ride.waitMinutes != null && (
-          <span className={`shrink-0 font-semibold text-[13px] tabular-nums ${
-            belowThreshold ? "text-sky-400" :
-            ride.waitMinutes >= 60 ? "text-red-400" :
-            ride.waitMinutes >= 30 ? "text-amber-400" : "text-emerald-400"
-          }`}>
-            {ride.waitMinutes}m{belowThreshold ? " ✓" : ""}
-          </span>
-        )}
-
-        <LLBadge state={ride.llState} />
+        {/* Wait + LL badge */}
+        <div className="flex flex-col items-end justify-center gap-1 pr-3 py-3 shrink-0">
+          {ride.waitMinutes != null && (
+            <span className={`font-bold tabular-nums ${
+              belowThreshold ? "text-sky-400" :
+              ride.waitMinutes >= 60 ? "text-red-400" :
+              ride.waitMinutes >= 30 ? "text-amber-400" : "text-emerald-400"
+            }`}>
+              <span className="text-base">{ride.waitMinutes}</span>
+              <span className="text-xs font-normal text-zinc-500">m{belowThreshold ? " ✓" : ""}</span>
+            </span>
+          )}
+          <LLBadge state={ride.llState} />
+        </div>
       </div>
 
+      {/* Return time */}
       {llOpen && ride.returnStart && (
-        <p className="text-[10px] text-emerald-400 -mt-0.5">
-          Return: {fmt12(ride.returnStart)}{ride.returnEnd ? ` – ${fmt12(ride.returnEnd)}` : ""}
-        </p>
+        <div className="px-4 pb-2.5 -mt-1">
+          <p className="text-xs text-emerald-400 font-medium">
+            Return: {fmt12(ride.returnStart)}{ride.returnEnd ? ` – ${fmt12(ride.returnEnd)}` : ""}
+          </p>
+        </div>
       )}
 
       {/* Threshold slider — pinned rides only */}
       {pinned && (
-        <div className="border-t border-zinc-800/60 pt-1.5">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] text-zinc-600">Notify if wait ≤</span>
-            <span className="text-[10px] font-medium text-ink-secondary">
+        <div className="border-t border-zinc-800/50 px-4 py-3">
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="text-xs text-zinc-500">Notify if wait drops to</span>
+            <span className={`text-xs font-semibold ${threshold !== null ? "text-sky-400" : "text-zinc-600"}`}>
               {threshold === null ? "off" : `${threshold} min`}
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <input
               type="range"
               min={0} max={120} step={5}
@@ -227,12 +239,12 @@ function RideRow({
                 const v = Number(e.target.value);
                 onThresholdChange(v === 0 ? null : v);
               }}
-              className="flex-1 h-1 accent-sky-400 cursor-pointer"
+              className="flex-1 accent-sky-400 cursor-pointer"
             />
             {threshold !== null && (
               <button
                 onClick={() => onThresholdChange(null)}
-                className="text-[10px] text-zinc-600 hover:text-zinc-300 px-1"
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 transition-colors text-xs shrink-0"
               >✕</button>
             )}
           </div>
@@ -258,7 +270,6 @@ export function LLMonitorPage() {
   const [pinned, setPinned] = useState<Set<string>>(() => loadPinned(parkKey));
   const [thresholds, setThresholds] = useState<Record<string, number | null>>(() => loadThresholds(parkKey));
 
-  // Refs for notification logic inside SSE handler (avoid stale closures)
   const prevLL = useRef<Record<string, string | null>>({});
   const prevStatus = useRef<Record<string, string | null>>({});
   const prevWait = useRef<Record<string, number | null>>({});
@@ -304,7 +315,6 @@ export function LLMonitorPage() {
     setPushStatus("active");
   }, []);
 
-  // Sync watch config to backend whenever pinned/thresholds/park/pushSub changes
   const syncWatches = useCallback((
     park: string, p: Set<string>, t: Record<string, number | null>, sub: PushSubscription | null
   ) => {
@@ -352,7 +362,7 @@ export function LLMonitorPage() {
     });
   }
 
-  // ── In-app notifications (when PWA is in foreground) ────────────────────────
+  // ── In-app notifications ─────────────────────────────────────────────────────
 
   function notifyInApp(title: string, body: string) {
     if (notifPerm !== "granted") return;
@@ -386,7 +396,6 @@ export function LLMonitorPage() {
             return;
           }
 
-          // In-app notifications for pinned rides (backend handles push when app is closed)
           const curPinned = pinnedRef.current;
           const curThresholds = thresholdsRef.current;
 
@@ -434,7 +443,6 @@ export function LLMonitorPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parkKey, notifPerm]);
 
-  // Force-refresh every 30s regardless of SSE cache
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
@@ -446,7 +454,6 @@ export function LLMonitorPage() {
     return () => clearInterval(interval);
   }, [parkKey]);
 
-  // Sort: pinned first → OPERATING before others → wait time desc
   const sortedRides = useMemo(() => {
     if (!snapshot) return [];
     return Object.entries(snapshot.rides).sort(([ka, a], [kb, b]) => {
@@ -460,85 +467,91 @@ export function LLMonitorPage() {
     });
   }, [snapshot, pinned]);
 
-  const selectedPark = PARKS.find((p) => p.key === parkKey)!;
   const fetchedAt = snapshot?.fetchedAt
     ? new Date(snapshot.fetchedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" })
     : null;
+
+  const selectedPark = PARKS.find((p) => p.key === parkKey)!;
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <div className="h-full overflow-y-auto overflow-x-hidden">
-      <div className="px-3 pt-3 pb-6 max-w-xl mx-auto flex flex-col gap-2.5">
+      <div className="px-3 pt-3 pb-8 max-w-xl mx-auto flex flex-col gap-3">
 
-        {/* Header — compact, just park + status */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {/* Park selector inline pills */}
-            <div
-              className="flex gap-1 overflow-x-auto"
-              style={{ touchAction: "pan-x", overflowY: "hidden" }}
-            >
-              {PARKS.map((p) => (
-                <button
-                  key={p.key}
-                  onClick={() => setParkKey(p.key)}
-                  className={`shrink-0 px-2 py-0.5 rounded text-[11px] font-medium transition-colors whitespace-nowrap ${
-                    parkKey === p.key
-                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                      : "text-zinc-500 border border-transparent hover:text-zinc-300"
-                  }`}
-                >
-                  {p.icon} {p.short}
-                </button>
-              ))}
-            </div>
+        {/* Park tabs + live status */}
+        <div className="flex items-center gap-2">
+          <div
+            className="flex gap-1.5 overflow-x-auto flex-1 min-w-0"
+            style={{ touchAction: "pan-x", overflowY: "hidden" }}
+          >
+            {PARKS.map((p) => (
+              <button
+                key={p.key}
+                onClick={() => setParkKey(p.key)}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap active:scale-95 ${
+                  parkKey === p.key
+                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                    : "text-zinc-500 border border-zinc-800/60 hover:text-zinc-300 hover:border-zinc-700"
+                }`}
+              >
+                {p.icon} {p.short}
+              </button>
+            ))}
           </div>
-          <div className="flex items-center gap-1.5 shrink-0 ml-2">
-            <span className={`w-1.5 h-1.5 rounded-full ${
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className={`w-2 h-2 rounded-full shrink-0 ${
               connState === "live" ? "bg-emerald-400 animate-pulse" :
               connState === "error" ? "bg-red-400" : "bg-amber-400 animate-pulse"
             }`} />
-            <span className="text-[10px] text-ink-muted capitalize">{connState}</span>
+            <span className="text-[11px] text-zinc-500 capitalize">{connState}</span>
           </div>
         </div>
 
-        {/* Push notification banner */}
+        {/* Push notification status */}
         {pushStatus === "active" ? (
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-[11px] px-3 py-1.5 flex items-center gap-1.5">
-            <span>✓</span>
-            <span>Background push on — star rides to get notified.</span>
+          <div className="flex items-center gap-2.5 rounded-xl border border-emerald-500/25 bg-emerald-950/30 text-emerald-300 text-xs px-3.5 py-2.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <span>Background alerts on — star rides to watch them.</span>
           </div>
         ) : pushStatus === "unsupported" || typeof Notification === "undefined" ? (
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 text-[11px] px-3 py-1.5">
-            📱 <strong>iOS:</strong> Share → <strong>"Add to Home Screen"</strong> to enable push
+          <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 text-amber-300 text-xs px-3.5 py-2.5 leading-relaxed">
+            <span className="font-semibold">iOS tip:</span> Share → <span className="font-semibold">"Add to Home Screen"</span> to enable push notifications.
           </div>
         ) : pushStatus === "subscribing" ? (
-          <div className="rounded-lg border border-zinc-700 bg-zinc-800/60 text-zinc-400 text-[11px] px-3 py-1.5 flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full border-2 border-zinc-400 border-t-transparent animate-spin" />
-            Enabling push…
+          <div className="flex items-center gap-2.5 rounded-xl border border-zinc-700 bg-zinc-800/60 text-zinc-400 text-xs px-3.5 py-2.5">
+            <span className="w-4 h-4 rounded-full border-2 border-zinc-400 border-t-transparent animate-spin shrink-0" />
+            Enabling push notifications…
           </div>
         ) : (
           <button
             onClick={enablePush}
-            className="w-full rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 text-[11px] px-3 py-1.5 text-left flex items-center justify-between hover:bg-amber-500/15 transition-colors"
+            className="w-full flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-950/20 text-amber-300 text-xs px-3.5 py-3 hover:bg-amber-950/30 transition-colors active:scale-[0.98]"
           >
-            <span>🔔 Enable background push notifications</span>
-            <span className="font-semibold shrink-0 ml-2">Allow →</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-base shrink-0">🔔</span>
+              <span>Enable background push notifications</span>
+            </div>
+            <span className="font-bold shrink-0 text-amber-200">Allow →</span>
           </button>
         )}
 
-        {/* Hint when nothing pinned */}
+        {/* Star hint */}
         {pinned.size === 0 && sortedRides.length > 0 && (
-          <p className="text-center text-[11px] text-zinc-600">
-            ☆ Star a ride to get push notifications
+          <p className="text-center text-xs text-zinc-600 py-1">
+            ☆ Tap a star to watch a ride
           </p>
         )}
 
         {/* Ride list */}
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-2">
           {!snapshot && (
-            <p className="text-center text-zinc-500 text-sm py-8">Connecting to live data…</p>
+            <div className="flex items-center justify-center py-16">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-6 h-6 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+                <p className="text-zinc-500 text-sm">Connecting to live data…</p>
+              </div>
+            </div>
           )}
           {snapshot?.error && (
             <p className="text-center text-red-400 text-sm py-4">Error: {snapshot.error}</p>
@@ -556,9 +569,11 @@ export function LLMonitorPage() {
           ))}
         </div>
 
-        <p className="text-center text-[10px] text-zinc-700">
-          {fetchedAt ? `Updated ${fetchedAt}` : "Fetching…"} · themeparks.wiki
-        </p>
+        {fetchedAt && (
+          <p className="text-center text-[11px] text-zinc-700 pt-1">
+            Updated {fetchedAt} · themeparks.wiki
+          </p>
+        )}
       </div>
     </div>
   );

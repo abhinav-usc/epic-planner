@@ -14,7 +14,7 @@ function write(plans: SavedPlan[]) {
 }
 
 export function useSavedPlans() {
-  const { plannedItems, targetDate, earlyEntry, loadPlanItems } = usePlanner();
+  const { plannedItems, targetDate, earlyEntry, currentPark, loadPlanItems } = usePlanner();
   const [plans, setPlans] = useState<SavedPlan[]>(read);
 
   const refresh = useCallback(() => setPlans(read()), []);
@@ -23,6 +23,7 @@ export function useSavedPlans() {
     const plan: SavedPlan = {
       id: `plan-${Date.now()}`,
       date: targetDate,
+      park: currentPark,
       name: name.trim() || `Plan ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
       savedAt: new Date().toISOString(),
       earlyEntry,
@@ -32,7 +33,7 @@ export function useSavedPlans() {
     write(updated);
     setPlans(updated);
     return plan.id;
-  }, [plannedItems, targetDate, earlyEntry]);
+  }, [plannedItems, targetDate, earlyEntry, currentPark]);
 
   const loadPlan = useCallback((id: string) => {
     const plan = read().find(p => p.id === id);
@@ -46,7 +47,8 @@ export function useSavedPlans() {
     setPlans(updated);
   }, []);
 
-  const plansForDate = plans.filter(p => p.date === targetDate);
+  // Filter by both date AND current park — each park gets its own plan list.
+  const plansForDate = plans.filter(p => p.date === targetDate && p.park === currentPark);
 
   return { plans, plansForDate, savePlan, loadPlan, deletePlan, refresh };
 }

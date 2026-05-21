@@ -173,31 +173,33 @@ function AttractionRow({ a, color, selected, onSelect }: {
               {pillWait}m
             </span>
           )}
+          {/* Must-do star: always visible on mobile (no hover needed on touch), hover-reveal on desktop */}
           <button
             onClick={(e) => { e.stopPropagation(); toggleMustDo(a.id); if (!pri) togglePriority(a.id); }}
             onPointerDown={(e) => e.stopPropagation()}
             className={clsx(
-              "text-[10px] w-5 h-5 rounded flex items-center justify-center transition-opacity",
+              "w-7 h-7 rounded flex items-center justify-center transition-all active:scale-90",
               pri?.must_do
                 ? "bg-accent text-bg-base"
-                : "bg-bg-hover text-ink-secondary opacity-0 group-hover:opacity-100",
+                : "bg-bg-hover text-ink-secondary sm:opacity-0 sm:group-hover:opacity-100",
             )}
-            title="Must-do (rope drop priority)"
+            title="Must-do"
           >
-            <IconStar size={10} stroke={2} />
+            <IconStar size={11} stroke={2} />
           </button>
+          {/* Add to plan: always visible on mobile */}
           <button
             onClick={(e) => { e.stopPropagation(); togglePriority(a.id); }}
             onPointerDown={(e) => e.stopPropagation()}
             className={clsx(
-              "text-[10px] w-5 h-5 rounded flex items-center justify-center transition-opacity",
+              "w-7 h-7 rounded flex items-center justify-center transition-all active:scale-90",
               pri && !pri.must_do
-                ? "bg-bg-hover text-ink-primary"
-                : "bg-bg-hover text-ink-secondary opacity-0 group-hover:opacity-100",
+                ? "bg-accent/20 text-accent"
+                : "bg-bg-hover text-ink-secondary sm:opacity-0 sm:group-hover:opacity-100",
             )}
-            title="Add to priorities"
+            title="Add to plan"
           >
-            <IconPlus size={10} stroke={2} />
+            <IconPlus size={11} stroke={2} />
           </button>
         </div>
       </div>
@@ -340,7 +342,7 @@ export function LandSidebar({ onAttractionClick, onRestaurantClick, selectedId, 
                       key={key}
                       onClick={() => setShowKind(key)}
                       className={clsx(
-                        "px-2 py-0.5 rounded transition-colors flex items-center gap-1",
+                        "px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 active:scale-95",
                         showKind === key
                           ? "bg-accent text-bg-base font-medium"
                           : "bg-bg-card text-ink-secondary hover:bg-bg-hover",
