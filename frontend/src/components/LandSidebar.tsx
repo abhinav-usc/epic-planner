@@ -26,6 +26,8 @@ interface SidebarProps {
   open: boolean;
   onToggle: () => void;
   mobileOpen?: boolean;
+  width?: number;       // controlled desktop width when open
+  isResizing?: boolean; // suppress CSS transition during drag
 }
 
 const LAND_ICONS: Partial<Record<LandId, Icon>> = {
@@ -243,7 +245,7 @@ function RestaurantRow({ r, color, selected, onSelect }: {
   );
 }
 
-export function LandSidebar({ onAttractionClick, onRestaurantClick, selectedId, open, onToggle, mobileOpen }: SidebarProps) {
+export function LandSidebar({ onAttractionClick, onRestaurantClick, selectedId, open, onToggle, mobileOpen, width, isResizing }: SidebarProps) {
   const { lands, attractions, restaurants } = usePlanner();
   const [query, setQuery] = useState("");
   const [showKind, setShowKind] = useState<"all" | "ride" | "show" | "experience" | "restaurant">("ride");
@@ -284,12 +286,14 @@ export function LandSidebar({ onAttractionClick, onRestaurantClick, selectedId, 
   }, [filteredRestaurants]);
 
   return (
-    <aside className={clsx(
-      "shrink-0 border-r border-bg-hover bg-bg-panel flex flex-col transition-all duration-200",
-      mobileOpen
-        ? "fixed inset-0 z-40 w-full"
-        : open ? "w-80" : "w-9",
-    )}>
+    <aside
+      className={clsx(
+        "shrink-0 border-r border-bg-hover bg-bg-panel flex flex-col",
+        !isResizing && "transition-all duration-200",
+        mobileOpen ? "fixed inset-0 z-40 w-full" : open ? "" : "w-9",
+      )}
+      style={(!mobileOpen && open) ? { width: width ?? 320 } : undefined}
+    >
       {!mobileOpen && !open ? (
         /* Collapsed strip — icon right-aligned, near the timeline edge */
         <button

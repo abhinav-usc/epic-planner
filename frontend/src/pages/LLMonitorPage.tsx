@@ -183,7 +183,7 @@ function RideRow({
           {pinned ? "★" : "☆"}
         </button>
 
-        {/* Name + status */}
+        {/* Name + status + return time — all left-aligned together */}
         <div className="flex-1 min-w-0 py-3 pl-0.5">
           <p className={`font-semibold text-sm leading-tight truncate pr-2 ${
             isDown ? "text-zinc-500" : "text-zinc-100"
@@ -194,6 +194,11 @@ function RideRow({
             ride.status === "REFURBISHMENT" ? "text-amber-400" :
             "text-zinc-600"
           }`}>{ride.status.replace("_", " ")}</p>
+          {llOpen && ride.returnStart && (
+            <p className="text-xs text-emerald-400 font-medium mt-0.5">
+              Return: {fmt12(ride.returnStart)}{ride.returnEnd ? ` – ${fmt12(ride.returnEnd)}` : ""}
+            </p>
+          )}
         </div>
 
         {/* Wait + LL badge */}
@@ -211,15 +216,6 @@ function RideRow({
           <LLBadge state={ride.llState} />
         </div>
       </div>
-
-      {/* Return time */}
-      {llOpen && ride.returnStart && (
-        <div className="px-4 pb-2.5 -mt-1">
-          <p className="text-xs text-emerald-400 font-medium">
-            Return: {fmt12(ride.returnStart)}{ride.returnEnd ? ` – ${fmt12(ride.returnEnd)}` : ""}
-          </p>
-        </div>
-      )}
 
       {/* Threshold slider — pinned rides only */}
       {pinned && (

@@ -18,9 +18,18 @@ interface OptimizePanelProps {
   open: boolean;
   onToggle: () => void;
   mobileOpen?: boolean;
+  width?: number;       // controlled desktop width when open
+  isResizing?: boolean; // suppress CSS transition during drag
 }
 
-export function OptimizePanel({ open, onToggle, mobileOpen }: OptimizePanelProps) {
+// Long land names (e.g. "The Wizarding World of Harry Potter: Ministry of Magic")
+// are truncated at the colon for compact display in the optimizer panel.
+function shortLandName(name: string): string {
+  const colon = name.indexOf(": ");
+  return colon !== -1 ? name.slice(0, colon).replace(/^The /, "") : name;
+}
+
+export function OptimizePanel({ open, onToggle, mobileOpen, width, isResizing }: OptimizePanelProps) {
   const {
     priorities, attractions, optimizing, optimizeResult,
     ropeDropLand, arrivalHour, lands, currentPark,
@@ -75,12 +84,14 @@ export function OptimizePanel({ open, onToggle, mobileOpen }: OptimizePanelProps
   );
 
   return (
-    <aside className={clsx(
-      "shrink-0 border-l border-bg-hover bg-bg-panel flex flex-col transition-all duration-200 min-h-0",
-      mobileOpen
-        ? "fixed inset-0 z-40 w-full"
-        : open ? "w-72" : "w-9",
-    )}>
+    <aside
+      className={clsx(
+        "shrink-0 border-l border-bg-hover bg-bg-panel flex flex-col min-h-0",
+        !isResizing && "transition-all duration-200",
+        mobileOpen ? "fixed inset-0 z-40 w-full" : open ? "" : "w-9",
+      )}
+      style={(!mobileOpen && open) ? { width: width ?? 288 } : undefined}
+    >
       {!mobileOpen && !open ? (
         <button
           onClick={onToggle}
@@ -140,7 +151,7 @@ export function OptimizePanel({ open, onToggle, mobileOpen }: OptimizePanelProps
                       <IconStar size={11} stroke={2} />
                     </button>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[11px] font-medium leading-tight truncate">{a.name}</div>
+                      <div className="text-[11px] font-medium leading-snug line-clamp-2">{a.name}</div>
                       <div className="text-[9px] text-ink-secondary mt-0.5">
                         {p.must_do ? "Must-do" : `Rank ${p.rank}`}
                         {a.kind === "show" && p.chosen_showtime && ` · ${p.chosen_showtime}`}
@@ -178,7 +189,7 @@ export function OptimizePanel({ open, onToggle, mobileOpen }: OptimizePanelProps
               >
                 <option value="">Let optimizer decide</option>
                 {LANDS.map(l => (
-                  <option key={l.id} value={l.id}>{l.name}</option>
+                  <option key={l.id} value={l.id}>{shortLandName(l.name)}</option>
                 ))}
               </select>
             </div>
@@ -293,7 +304,7 @@ export function OptimizePanel({ open, onToggle, mobileOpen }: OptimizePanelProps
                         )}>
                           {active && <span className="text-[8px] leading-none">✓</span>}
                         </span>
-                        <span className="truncate">{l.name}</span>
+                        <span className="truncate">{shortLandName(l.name)}</span>
                       </button>
                       {active && (
                         <select

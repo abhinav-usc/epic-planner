@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import {
   DndContext,
@@ -63,6 +63,62 @@ export function PlannerPage() {
   const [rightOpen, setRightOpen] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const [showFeasibility, setShowFeasibility] = useState(false);
+
+  // Resizable sidebar widths (persisted)
+  const [leftWidth, setLeftWidth] = useState(() =>
+    Number(localStorage.getItem("sidebar-left-width") || 0) || 300
+  );
+  const [rightWidth, setRightWidth] = useState(() =>
+    Number(localStorage.getItem("sidebar-right-width") || 0) || 272
+  );
+  const [isResizingLeft, setIsResizingLeft] = useState(false);
+  const [isResizingRight, setIsResizingRight] = useState(false);
+  const leftWidthRef = useRef(leftWidth);
+  leftWidthRef.current = leftWidth;
+  const rightWidthRef = useRef(rightWidth);
+  rightWidthRef.current = rightWidth;
+
+  const startLeftResize = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = leftWidthRef.current;
+    setIsResizingLeft(true);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    const onMove = (ev: PointerEvent) =>
+      setLeftWidth(Math.max(200, Math.min(520, startW + ev.clientX - startX)));
+    const onUp = () => {
+      setIsResizingLeft(false);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      localStorage.setItem("sidebar-left-width", String(leftWidthRef.current));
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, []);
+
+  const startRightResize = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = rightWidthRef.current;
+    setIsResizingRight(true);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    const onMove = (ev: PointerEvent) =>
+      setRightWidth(Math.max(200, Math.min(520, startW - (ev.clientX - startX))));
+    const onUp = () => {
+      setIsResizingRight(false);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      localStorage.setItem("sidebar-right-width", String(rightWidthRef.current));
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, []);
 
   // Mobile tab nav state
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < MOBILE_WIDTH);
@@ -334,11 +390,13 @@ export function PlannerPage() {
           </div>
         )}
         <div className="flex-1 flex min-h-0 relative overflow-hidden">
-          {/* On desktop, always render. On mobile, only render when on attractions tab (as overlay). */}
+          {/* Left sidebar */}
           {(!isMobile || mobileTab === "attractions") && (
             <LandSidebar
               open={leftOpen}
               mobileOpen={isMobile && mobileTab === "attractions"}
+              width={leftWidth}
+              isResizing={isResizingLeft}
               onToggle={() => {
                 if (isMobile) setMobileTab("timeline");
                 else setLeftOpen(o => !o);
@@ -354,6 +412,19 @@ export function PlannerPage() {
               selectedId={selected?.id ?? selectedRestaurant?.id ?? null}
             />
           )}
+
+          {/* Left resize handle */}
+          {!isMobile && leftOpen && (
+            <div
+              onPointerDown={startLeftResize}
+              className={clsx(
+                "shrink-0 w-1 cursor-col-resize select-none transition-colors duration-75",
+                isResizingLeft ? "bg-accent/60" : "hover:bg-accent/40 bg-transparent",
+              )}
+              style={{ touchAction: "none" }}
+            />
+          )}
+
           <main className={clsx(
             "flex-1 flex flex-col min-w-0",
             isMobile && mobileTab !== "timeline" && "hidden",
@@ -370,11 +441,26 @@ export function PlannerPage() {
               </div>
             )}
           </main>
-          {/* On desktop, always render. On mobile, only render when on optimize tab (as overlay). */}
+
+          {/* Right resize handle */}
+          {!isMobile && rightOpen && (
+            <div
+              onPointerDown={startRightResize}
+              className={clsx(
+                "shrink-0 w-1 cursor-col-resize select-none transition-colors duration-75",
+                isResizingRight ? "bg-accent/60" : "hover:bg-accent/40 bg-transparent",
+              )}
+              style={{ touchAction: "none" }}
+            />
+          )}
+
+          {/* Right sidebar */}
           {(!isMobile || mobileTab === "optimize") && (
             <OptimizePanel
               open={rightOpen}
               mobileOpen={isMobile && mobileTab === "optimize"}
+              width={rightWidth}
+              isResizing={isResizingRight}
               onToggle={() => {
                 if (isMobile) setMobileTab("timeline");
                 else setRightOpen(o => !o);
