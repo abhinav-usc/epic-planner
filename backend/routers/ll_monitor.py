@@ -247,7 +247,8 @@ def _send_push(watch: DeviceWatch, title: str, body: str) -> None:
         else:
             log.warning("Push failed for %s: %s", watch.device_id[:8], exc)
     except Exception as exc:
-        log.warning("Push error for %s: %s", watch.device_id[:8], exc)
+        import traceback
+        log.warning("Push error for %s: %s\n%s", watch.device_id[:8], exc, traceback.format_exc())
 
 
 async def _welcome_push(device_id: str) -> None:
