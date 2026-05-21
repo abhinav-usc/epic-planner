@@ -64,7 +64,7 @@ app.include_router(ll.router)
 app.include_router(live.router)
 
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 def health() -> dict:
     return {"status": "ok"}
 
