@@ -24,6 +24,7 @@ import dataclasses
 import json
 import logging
 import os
+import random
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -254,6 +255,22 @@ def _send_push(watch: DeviceWatch, title: str, body: str) -> None:
         log.warning("Push error for %s: %s", watch.device_id[:8], exc)
 
 
+async def _welcome_push(device_id: str) -> None:
+    """Fire a welcome notification 60–150 s after a new device registers."""
+    delay = random.uniform(60, 150)
+    await asyncio.sleep(delay)
+    watch = _subscriptions.get(device_id)
+    if not watch:
+        return  # unregistered in the meantime
+    park_name = _PARKS.get(watch.park, {}).get("name", "the park")
+    _send_push(
+        watch,
+        title="⚡ LL Monitor active",
+        body=f"Push notifications are working! Star rides on {park_name} to get alerted when LL opens or waits drop — even when the app is closed.",
+    )
+    log.info("Welcome push sent to %s", device_id[:8])
+
+
 def _check_and_push(watch: DeviceWatch, snapshot: dict) -> None:
     """Compare current snapshot against prev state; push if conditions changed."""
     rides = snapshot["rides"]
@@ -387,6 +404,7 @@ async def push_subscribe(req: PushSubscribeRequest) -> dict:
         raise HTTPException(status_code=400, detail=f"Unknown park: {req.park}")
 
     existing = _subscriptions.get(req.device_id)
+    is_new = existing is None
 
     watch = DeviceWatch(
         device_id=req.device_id,
@@ -403,6 +421,11 @@ async def push_subscribe(req: PushSubscribeRequest) -> dict:
     _save_subscriptions()
     log.info("Push subscription registered: %s → %s (%d watches)",
              req.device_id[:8], req.park, len(req.watches))
+
+    # Send a welcome push to new devices so they can confirm notifications work.
+    if is_new:
+        asyncio.create_task(_welcome_push(req.device_id))
+
     return {"status": "ok", "park": req.park, "watches": len(req.watches)}
 
 
