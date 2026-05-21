@@ -22,7 +22,7 @@ primary_region = 'ams'
     soft_limit = 50
 
 [[vm]]
-  memory = '512mb'
-  cpu_kind = 'shared'
+  memory = "256mb"
+  cpu_kind = "shared"
   cpus = 1
   memory_mb = 256
