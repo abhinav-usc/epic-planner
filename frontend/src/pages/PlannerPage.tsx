@@ -24,13 +24,13 @@ import { usePlanner, SHOW_QUEUE_MINUTES } from "../store/plannerStore";
 import { api } from "../api/client";
 import type { Attraction, LandId, ParkId, PlannedItem, Restaurant } from "../types";
 
-const PARKS: { id: ParkId; name: string; icon: string }[] = [
-  { id: "epic_universe",       name: "Epic Universe",          icon: "🌌" },
-  { id: "magic_kingdom",       name: "Magic Kingdom",          icon: "🏰" },
-  { id: "epcot",               name: "EPCOT",                  icon: "🌍" },
-  { id: "hollywood_studios",   name: "Hollywood Studios",      icon: "🎬" },
-  { id: "animal_kingdom",      name: "Animal Kingdom",         icon: "🌿" },
-  { id: "disneyland",          name: "Disneyland",             icon: "🏰" },
+const PARKS: { id: ParkId; name: string; icon: string; short: string }[] = [
+  { id: "epic_universe",       name: "Epic Universe",          icon: "🌌", short: "EU" },
+  { id: "magic_kingdom",       name: "Magic Kingdom",          icon: "🏰", short: "MK" },
+  { id: "epcot",               name: "EPCOT",                  icon: "🌍", short: "EP" },
+  { id: "hollywood_studios",   name: "Hollywood Studios",      icon: "🎬", short: "HS" },
+  { id: "animal_kingdom",      name: "Animal Kingdom",         icon: "🌿", short: "AK" },
+  { id: "disneyland",          name: "Disneyland",             icon: "🏰", short: "DL" },
 ];
 
 type ActiveDrag =
@@ -301,13 +301,16 @@ export function PlannerPage() {
         <SettingsBar onShowHistory={() => setShowHistory(true)} />
 
         {/* Park selector tabs */}
-        <div className="flex items-center gap-0 border-b border-bg-hover bg-bg-panel shrink-0 overflow-x-auto touch-pan-x px-2">
+        <div
+          className="flex items-center gap-0 border-b border-bg-hover bg-bg-panel shrink-0 overflow-x-auto px-1"
+          style={{ touchAction: "pan-x", overflowY: "hidden" }}
+        >
           {PARKS.map(p => (
             <button
               key={p.id}
               onClick={() => { if (p.id !== currentPark) switchPark(p.id); }}
               className={clsx(
-                "flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium whitespace-nowrap transition-colors shrink-0",
+                "flex items-center gap-1 px-2 py-1.5 text-[10px] font-medium whitespace-nowrap transition-colors shrink-0",
                 "border-b-2 -mb-px",
                 currentPark === p.id
                   ? "border-accent text-ink-primary"
@@ -315,7 +318,8 @@ export function PlannerPage() {
               )}
             >
               <span>{p.icon}</span>
-              <span>{p.name}</span>
+              <span className="hidden sm:inline">{p.name}</span>
+              <span className="sm:hidden">{p.short}</span>
             </button>
           ))}
         </div>

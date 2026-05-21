@@ -18,21 +18,21 @@ function App() {
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden">
-      {/* Top nav */}
-      <nav className="shrink-0 flex items-center gap-1 px-3 py-1.5 bg-bg-base/90 backdrop-blur border-b border-zinc-800/60 z-50">
+      {/* Top nav — compact, left-aligned */}
+      <nav className="shrink-0 flex items-center gap-1 px-2 py-1 bg-bg-panel border-b border-bg-hover z-50">
         <button
           onClick={() => switchTab("planner")}
-          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+          className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
             tab === "planner"
               ? "bg-accent/20 text-accent"
               : "text-ink-muted hover:text-ink-primary"
           }`}
         >
-          Epic Planner
+          Trip Planner
         </button>
         <button
           onClick={() => switchTab("ll-monitor")}
-          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+          className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
             tab === "ll-monitor"
               ? "bg-emerald-500/20 text-emerald-400"
               : "text-ink-muted hover:text-ink-primary"
@@ -43,7 +43,7 @@ function App() {
       </nav>
 
       {/* Page content */}
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {tab === "planner" ? <PlannerPage /> : <LLMonitorPage />}
       </div>
     </div>

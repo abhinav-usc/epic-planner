@@ -76,7 +76,7 @@ export function OptimizePanel({ open, onToggle, mobileOpen }: OptimizePanelProps
 
   return (
     <aside className={clsx(
-      "shrink-0 border-l border-bg-hover bg-bg-panel flex flex-col transition-all duration-200",
+      "shrink-0 border-l border-bg-hover bg-bg-panel flex flex-col transition-all duration-200 min-h-0",
       mobileOpen
         ? "fixed inset-0 z-40 w-full"
         : open ? "w-72" : "w-9",
@@ -470,23 +470,6 @@ export function OptimizePanel({ open, onToggle, mobileOpen }: OptimizePanelProps
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Optimize button + result */}
-
-          <div className="p-3 border-t border-bg-hover space-y-2 shrink-0">
-            <button
-              onClick={runOptimize}
-              disabled={priorities.length === 0 || optimizing}
-              className={clsx(
-                "w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed",
-                "py-2 text-[11px] flex items-center justify-center gap-1",
-              )}
-            >
-              <IconSparkles size={13} stroke={1.5} />
-              {optimizing ? "Optimizing…" : "Optimize my day"}
-            </button>
-
             {optimizeResult && (
               <div className="card p-3 text-[10px] space-y-1">
                 <div className="flex justify-between">
@@ -561,6 +544,21 @@ export function OptimizePanel({ open, onToggle, mobileOpen }: OptimizePanelProps
                 </ul>
               </div>
             )}
+          </div>
+
+          {/* Optimize button — always pinned at bottom */}
+          <div className="px-3 py-2.5 border-t border-bg-hover shrink-0">
+            <button
+              onClick={runOptimize}
+              disabled={priorities.length === 0 || optimizing}
+              className={clsx(
+                "w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed",
+                "py-2 text-[11px] flex items-center justify-center gap-1",
+              )}
+            >
+              <IconSparkles size={13} stroke={1.5} />
+              {optimizing ? "Optimizing…" : "Optimize my day"}
+            </button>
           </div>
         </>
       )}
