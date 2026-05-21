@@ -19,6 +19,7 @@ Routes:
 from __future__ import annotations
 
 import asyncio
+import base64
 import dataclasses
 import json
 import logging
@@ -46,11 +47,34 @@ _VAPID_EMAIL = os.getenv("VAPID_EMAIL", "mailto:admin@example.com")
 _VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
 _VAPID_PRIVATE_PEM = os.getenv("VAPID_PRIVATE_KEY_PEM", "")
 
-# Load .env if keys are missing (local dev convenience)
+
+def _raw_b64url_to_pem(raw_b64url: str) -> str:
+    """Convert a base64url-encoded raw EC private key scalar to a SEC1 PEM string.
+
+    Avoids storing multiline PEM in env vars (newlines get corrupted in some
+    hosting environments). The cryptography package is already a transitive
+    dependency of pywebpush, so this import is always available.
+    """
+    from cryptography.hazmat.primitives.asymmetric.ec import SECP256R1, derive_private_key
+    from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat
+    raw = base64.urlsafe_b64decode(raw_b64url + "==")
+    private_int = int.from_bytes(raw, "big")
+    key = derive_private_key(private_int, SECP256R1())
+    return key.private_bytes(Encoding.PEM, PrivateFormat.TraditionalOpenSSL, NoEncryption()).decode()
+
+
+# Prefer the single-line raw key (no newline corruption risk) over PEM env var.
+_raw_key = os.getenv("VAPID_PRIVATE_KEY_RAW", "")
+if _raw_key:
+    try:
+        _VAPID_PRIVATE_PEM = _raw_b64url_to_pem(_raw_key)
+    except Exception as _e:
+        log.error("Failed to decode VAPID_PRIVATE_KEY_RAW: %s", _e)
+
+# Load .env if keys are still missing (local dev convenience)
 if not _VAPID_PUBLIC_KEY or not _VAPID_PRIVATE_PEM:
     _env_path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
     if os.path.exists(_env_path):
-        _current_key = None
         _pem_lines: list[str] = []
         _collecting_pem = False
         with open(_env_path) as _f:
@@ -60,6 +84,11 @@ if not _VAPID_PUBLIC_KEY or not _VAPID_PRIVATE_PEM:
                     _VAPID_EMAIL = _line[len("VAPID_EMAIL="):]
                 elif _line.startswith("VAPID_PUBLIC_KEY="):
                     _VAPID_PUBLIC_KEY = _line[len("VAPID_PUBLIC_KEY="):]
+                elif _line.startswith("VAPID_PRIVATE_KEY_RAW=") and not _raw_key:
+                    try:
+                        _VAPID_PRIVATE_PEM = _raw_b64url_to_pem(_line[len("VAPID_PRIVATE_KEY_RAW="):])
+                    except Exception as _e:
+                        log.error("Failed to decode VAPID_PRIVATE_KEY_RAW from .env: %s", _e)
                 elif _line.startswith("VAPID_PRIVATE_KEY_PEM="):
                     _collecting_pem = True
                     _pem_lines = [_line[len("VAPID_PRIVATE_KEY_PEM="):]]
@@ -67,7 +96,7 @@ if not _VAPID_PUBLIC_KEY or not _VAPID_PRIVATE_PEM:
                     _pem_lines.append(_line)
                     if "-----END" in _line:
                         _collecting_pem = False
-        if _pem_lines:
+        if _pem_lines and not _VAPID_PRIVATE_PEM:
             _VAPID_PRIVATE_PEM = "\n".join(_pem_lines)
 
 if not _VAPID_PUBLIC_KEY:
