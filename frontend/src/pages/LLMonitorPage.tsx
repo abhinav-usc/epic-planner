@@ -50,6 +50,17 @@ function saveThresholds(park: string, t: Record<string, number | null>) {
   localStorage.setItem(`ll-thresholds-${park}`, JSON.stringify(t));
 }
 
+function loadReturnBefores(park: string): Record<string, string | null> {
+  try {
+    const raw = localStorage.getItem(`ll-return-befores-${park}`);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveReturnBefores(park: string, t: Record<string, string | null>) {
+  localStorage.setItem(`ll-return-befores-${park}`, JSON.stringify(t));
+}
+
 function getDeviceId(): string {
   let id = localStorage.getItem("ll-device-id");
   if (!id) {
@@ -88,12 +99,14 @@ async function syncWatchConfig(
   park: string,
   pinned: Set<string>,
   thresholds: Record<string, number | null>,
+  returnBefores: Record<string, string | null>,
   pushSub: PushSubscription | null,
 ): Promise<void> {
   if (!pushSub || pinned.size === 0) return;
   const watches = [...pinned].map((key) => ({
     key,
     threshold: thresholds[key] ?? null,
+    return_before: returnBefores[key] ?? null,
   }));
   try {
     await fetch("/api/ll/push-subscribe", {
@@ -144,14 +157,16 @@ function LLBadge({ state }: { state: string | null }) {
 }
 
 function RideRow({
-  rideKey, ride, pinned, threshold, onPinToggle, onThresholdChange,
+  rideKey, ride, pinned, threshold, returnBefore, onPinToggle, onThresholdChange, onReturnBeforeChange,
 }: {
   rideKey: string;
   ride: RideStatus;
   pinned: boolean;
   threshold: number | null;
+  returnBefore: string | null;
   onPinToggle: () => void;
   onThresholdChange: (val: number | null) => void;
+  onReturnBeforeChange: (val: string | null) => void;
 }) {
   const llOpen = ride.llState === "AVAILABLE";
   const belowThreshold = pinned && threshold !== null && ride.waitMinutes !== null && ride.waitMinutes <= threshold;
@@ -217,32 +232,57 @@ function RideRow({
         </div>
       </div>
 
-      {/* Threshold slider — pinned rides only */}
+      {/* Alerts — pinned rides only */}
       {pinned && (
-        <div className="border-t border-zinc-800/50 px-4 py-3">
-          <div className="flex items-center justify-between mb-2.5">
-            <span className="text-xs text-zinc-500">Notify if wait drops to</span>
-            <span className={`text-xs font-semibold ${threshold !== null ? "text-sky-400" : "text-zinc-600"}`}>
-              {threshold === null ? "off" : `${threshold} min`}
-            </span>
+        <div className="border-t border-zinc-800/50 px-4 py-3 flex flex-col gap-3">
+          {/* Wait threshold slider */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-zinc-500">Notify if wait drops to</span>
+              <span className={`text-xs font-semibold ${threshold !== null ? "text-sky-400" : "text-zinc-600"}`}>
+                {threshold === null ? "off" : `${threshold} min`}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min={0} max={120} step={5}
+                value={threshold ?? 0}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  onThresholdChange(v === 0 ? null : v);
+                }}
+                className="flex-1 accent-sky-400 cursor-pointer"
+              />
+              {threshold !== null && (
+                <button
+                  onClick={() => onThresholdChange(null)}
+                  className="w-7 h-7 flex items-center justify-center rounded-full bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 transition-colors text-xs shrink-0"
+                >✕</button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <input
-              type="range"
-              min={0} max={120} step={5}
-              value={threshold ?? 0}
-              onChange={(e) => {
-                const v = Number(e.target.value);
-                onThresholdChange(v === 0 ? null : v);
-              }}
-              className="flex-1 accent-sky-400 cursor-pointer"
-            />
-            {threshold !== null && (
-              <button
-                onClick={() => onThresholdChange(null)}
-                className="w-7 h-7 flex items-center justify-center rounded-full bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 transition-colors text-xs shrink-0"
-              >✕</button>
-            )}
+
+          {/* LL return time picker */}
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs text-zinc-500 shrink-0">Notify if LL return by</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="time"
+                value={returnBefore ?? ""}
+                onChange={(e) => onReturnBeforeChange(e.target.value || null)}
+                className="text-xs bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1 text-zinc-200 focus:outline-none focus:border-emerald-500 w-28"
+              />
+              {returnBefore !== null && (
+                <button
+                  onClick={() => onReturnBeforeChange(null)}
+                  className="w-6 h-6 flex items-center justify-center rounded-full bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 transition-colors text-xs shrink-0"
+                >✕</button>
+              )}
+              {returnBefore === null && (
+                <span className="text-xs text-zinc-600">off</span>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -265,6 +305,7 @@ export function LLMonitorPage() {
   const [pushStatus, setPushStatus] = useState<"idle" | "subscribing" | "active" | "unsupported">("idle");
   const [pinned, setPinned] = useState<Set<string>>(() => loadPinned(parkKey));
   const [thresholds, setThresholds] = useState<Record<string, number | null>>(() => loadThresholds(parkKey));
+  const [returnBefores, setReturnBefores] = useState<Record<string, string | null>>(() => loadReturnBefores(parkKey));
 
   const prevLL = useRef<Record<string, string | null>>({});
   const prevStatus = useRef<Record<string, string | null>>({});
@@ -274,6 +315,8 @@ export function LLMonitorPage() {
   pinnedRef.current = pinned;
   const thresholdsRef = useRef(thresholds);
   thresholdsRef.current = thresholds;
+  const returnBeforesRef = useRef(returnBefores);
+  returnBeforesRef.current = returnBefores;
   const pushSubRef = useRef(pushSub);
   pushSubRef.current = pushSub;
 
@@ -312,15 +355,16 @@ export function LLMonitorPage() {
   }, []);
 
   const syncWatches = useCallback((
-    park: string, p: Set<string>, t: Record<string, number | null>, sub: PushSubscription | null
+    park: string, p: Set<string>, t: Record<string, number | null>,
+    rb: Record<string, string | null>, sub: PushSubscription | null
   ) => {
-    syncWatchConfig(park, p, t, sub);
+    syncWatchConfig(park, p, t, rb, sub);
   }, []);
 
   useEffect(() => {
-    syncWatches(parkKey, pinned, thresholds, pushSub);
+    syncWatches(parkKey, pinned, thresholds, returnBefores, pushSub);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parkKey, pinned, thresholds, pushSub]);
+  }, [parkKey, pinned, thresholds, returnBefores, pushSub]);
 
   // ── Park switching ────────────────────────────────────────────────────────────
 
@@ -330,8 +374,10 @@ export function LLMonitorPage() {
     setConnState("connecting");
     const p = loadPinned(parkKey);
     const t = loadThresholds(parkKey);
+    const rb = loadReturnBefores(parkKey);
     setPinned(p);
     setThresholds(t);
+    setReturnBefores(rb);
     prevLL.current = {};
     prevStatus.current = {};
     prevWait.current = {};
@@ -357,6 +403,75 @@ export function LLMonitorPage() {
       return next;
     });
   }
+
+  function setReturnBefore(key: string, val: string | null) {
+    setReturnBefores((prev) => {
+      const next = { ...prev, [key]: val };
+      saveReturnBefores(parkKey, next);
+      return next;
+    });
+  }
+
+  // ── Service worker messages (auto-clear after notification fires) ─────────────
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type !== "WATCH_REMOVED") return;
+      const rideKey: string = event.data.rideKey;
+      setThresholds((prev) => {
+        if (prev[rideKey] === null || prev[rideKey] === undefined) return prev;
+        const next = { ...prev, [rideKey]: null };
+        saveThresholds(parkKey, next);
+        return next;
+      });
+      setReturnBefores((prev) => {
+        if (!prev[rideKey]) return prev;
+        const next = { ...prev };
+        delete next[rideKey];
+        saveReturnBefores(parkKey, next);
+        return next;
+      });
+    };
+    navigator.serviceWorker.addEventListener("message", handler);
+    return () => navigator.serviceWorker.removeEventListener("message", handler);
+  }, [parkKey]);
+
+  // Sync with server on mount so auto-cleared alerts reflect in UI even after app was closed
+  useEffect(() => {
+    const deviceId = getDeviceId();
+    fetch(`/api/ll/watches/${deviceId}`)
+      .then((r) => r.json())
+      .then((data: { park: string | null; watches: Record<string, { threshold: number | null; return_before: string | null }> }) => {
+        if (data.park !== parkKey) return;
+        setThresholds((prev) => {
+          let changed = false;
+          const next = { ...prev };
+          for (const [key, info] of Object.entries(data.watches)) {
+            if (info.threshold === null && prev[key] != null) {
+              next[key] = null;
+              changed = true;
+            }
+          }
+          if (changed) saveThresholds(parkKey, next);
+          return changed ? next : prev;
+        });
+        setReturnBefores((prev) => {
+          let changed = false;
+          const next = { ...prev };
+          for (const [key, info] of Object.entries(data.watches)) {
+            if (info.return_before === null && prev[key]) {
+              delete next[key];
+              changed = true;
+            }
+          }
+          if (changed) saveReturnBefores(parkKey, next);
+          return changed ? next : prev;
+        });
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parkKey]);
 
   // ── In-app notifications ─────────────────────────────────────────────────────
 
@@ -559,8 +674,10 @@ export function LLMonitorPage() {
               ride={ride}
               pinned={pinned.has(key)}
               threshold={thresholds[key] ?? null}
+              returnBefore={returnBefores[key] ?? null}
               onPinToggle={() => togglePin(key)}
               onThresholdChange={(v) => setThreshold(key, v)}
+              onReturnBeforeChange={(v) => setReturnBefore(key, v)}
             />
           ))}
         </div>

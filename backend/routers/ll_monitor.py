@@ -116,7 +116,8 @@ class DeviceWatch:
     device_id: str
     push_sub: dict          # Full PushSubscription JSON from browser
     park: str
-    watches: dict[str, Optional[int]]   # ride_key → wait threshold (None = no threshold)
+    watches: dict[str, Optional[int]]         # ride_key → wait threshold (None = no threshold)
+    return_befores: dict[str, Optional[str]] = field(default_factory=dict)  # ride_key → "HH:MM"
     # Change-detection state — populated on first poll after registration
     prev_ll: dict[str, Optional[str]] = field(default_factory=dict)
     prev_status: dict[str, Optional[str]] = field(default_factory=dict)
@@ -197,13 +198,50 @@ async def _fetch_park(park_key: str) -> dict:
 
 # ── Push sending ──────────────────────────────────────────────────────────────
 
-def _send_push(watch: DeviceWatch, title: str, body: str) -> None:
+# ── Timezone helpers ──────────────────────────────────────────────────────────
+
+_PARK_UTC_OFFSET = {
+    "disneyland": -7,       # Pacific Daylight Time (May)
+    "magic_kingdom": -4,    # Eastern Daylight Time (May)
+    "epcot": -4,
+    "hollywood_studios": -4,
+    "animal_kingdom": -4,
+}
+
+
+def _return_minutes(return_start: str, park_key: str) -> Optional[int]:
+    """Return minutes-since-midnight in park local time from UTC ISO returnStart."""
+    offset = _PARK_UTC_OFFSET.get(park_key, -4)
+    try:
+        dt = datetime.fromisoformat(return_start.replace("Z", "+00:00"))
+        local_hour = (dt.hour + offset) % 24
+        return local_hour * 60 + dt.minute
+    except Exception:
+        return None
+
+
+def _parse_hhmm(hhmm: str) -> Optional[int]:
+    """'HH:MM' → minutes since midnight."""
+    try:
+        h, m = map(int, hhmm.split(":"))
+        return h * 60 + m
+    except Exception:
+        return None
+
+
+# ── Push sending ──────────────────────────────────────────────────────────────
+
+def _send_push(watch: DeviceWatch, title: str, body: str,
+               removed_watch: Optional[str] = None) -> None:
     if not _PUSH_ENABLED:
         return
+    payload: dict = {"title": title, "body": body}
+    if removed_watch:
+        payload["removed_watch"] = removed_watch
     try:
         webpush(
             subscription_info=watch.push_sub,
-            data=json.dumps({"title": title, "body": body}),
+            data=json.dumps(payload),
             vapid_private_key=_VAPID_PRIVATE_KEY,
             vapid_claims={"sub": _VAPID_EMAIL},
         )
@@ -211,15 +249,13 @@ def _send_push(watch: DeviceWatch, title: str, body: str) -> None:
     except WebPushException as exc:
         status = getattr(exc.response, "status_code", None)
         if status in (404, 410):
-            # Subscription expired — remove it
             _subscriptions.pop(watch.device_id, None)
             _save_subscriptions()
             log.info("Removed expired subscription for %s", watch.device_id[:8])
         else:
             log.warning("Push failed for %s: %s", watch.device_id[:8], exc)
     except Exception as exc:
-        import traceback
-        log.warning("Push error for %s: %s\n%s", watch.device_id[:8], exc, traceback.format_exc())
+        log.warning("Push error for %s: %s", watch.device_id[:8], exc)
 
 
 async def _welcome_push(device_id: str) -> None:
@@ -274,6 +310,8 @@ def _check_and_push(watch: DeviceWatch, snapshot: dict) -> None:
         watch.initialized = True
         return
 
+    changed = False
+
     for ride_key, threshold in list(watch.watches.items()):
         ride = rides.get(ride_key)
         if not ride:
@@ -284,6 +322,25 @@ def _check_and_push(watch: DeviceWatch, snapshot: dict) -> None:
             body = f"Return: {ride['returnStart']}" if ride.get("returnStart") else "Book now!"
             _send_push(watch, f"⚡ {ride['name']} LL Open!", body)
 
+        # LL return time within user's window (fires once then auto-clears)
+        return_before = watch.return_befores.get(ride_key)
+        if (
+            return_before
+            and ride["llState"] == "AVAILABLE"
+            and ride.get("returnStart")
+        ):
+            cutoff = _parse_hhmm(return_before)
+            current = _return_minutes(ride["returnStart"], watch.park)
+            if cutoff is not None and current is not None and current <= cutoff:
+                _send_push(
+                    watch,
+                    f"⚡ {ride['name']} LL return is in your window!",
+                    f"Book now — return opens by {return_before}.",
+                    removed_watch=ride_key,
+                )
+                del watch.return_befores[ride_key]
+                changed = True
+
         # Ride opened or closed
         prev_st = watch.prev_status.get(ride_key)
         if prev_st is not None and prev_st != ride["status"]:
@@ -292,7 +349,7 @@ def _check_and_push(watch: DeviceWatch, snapshot: dict) -> None:
             elif prev_st == "OPERATING":
                 _send_push(watch, f"🚫 {ride['name']} closed", f"Status: {ride['status']}")
 
-        # Wait dropped below threshold
+        # Wait dropped below threshold (fires once then auto-clears)
         prev_w = watch.prev_wait.get(ride_key)
         cur_w = ride["waitMinutes"]
         if (
@@ -302,13 +359,22 @@ def _check_and_push(watch: DeviceWatch, snapshot: dict) -> None:
             and prev_w > threshold
             and cur_w <= threshold
         ):
-            _send_push(watch, f"⏱️ {ride['name']} wait is {cur_w} min",
-                       f"Dropped below your {threshold} min alert!")
+            _send_push(
+                watch,
+                f"⏱️ {ride['name']} wait is {cur_w} min",
+                f"Dropped below your {threshold} min alert!",
+                removed_watch=ride_key,
+            )
+            watch.watches[ride_key] = None  # clear threshold, keep watching LL/status
+            changed = True
 
         # Advance state
         watch.prev_ll[ride_key] = ride["llState"]
         watch.prev_status[ride_key] = ride["status"]
         watch.prev_wait[ride_key] = ride["waitMinutes"]
+
+    if changed:
+        _save_subscriptions()
 
 
 # ── Poll loop ─────────────────────────────────────────────────────────────────
@@ -378,6 +444,7 @@ async def vapid_public_key() -> dict:
 class PushWatch(BaseModel):
     key: str
     threshold: Optional[int] = None
+    return_before: Optional[str] = None   # "HH:MM" park local time
 
 
 class PushSubscribeRequest(BaseModel):
@@ -385,6 +452,24 @@ class PushSubscribeRequest(BaseModel):
     push_subscription: dict   # Full PushSubscription JSON from browser
     park: str
     watches: list[PushWatch]  # Rides to watch
+
+
+@router.get("/watches/{device_id}")
+async def get_watches(device_id: str) -> dict:
+    """Return current watch config for a device (used by client to sync after auto-clear)."""
+    watch = _subscriptions.get(device_id)
+    if not watch:
+        return {"park": None, "watches": {}}
+    return {
+        "park": watch.park,
+        "watches": {
+            key: {
+                "threshold": threshold,
+                "return_before": watch.return_befores.get(key),
+            }
+            for key, threshold in watch.watches.items()
+        },
+    }
 
 
 @router.post("/push-subscribe")
@@ -402,6 +487,7 @@ async def push_subscribe(req: PushSubscribeRequest) -> dict:
         push_sub=req.push_subscription,
         park=req.park,
         watches={w.key: w.threshold for w in req.watches},
+        return_befores={w.key: w.return_before for w in req.watches if w.return_before},
         # Carry over prev state if park unchanged so we don't re-fire on re-register
         prev_ll=existing.prev_ll if existing and existing.park == req.park else {},
         prev_status=existing.prev_status if existing and existing.park == req.park else {},
@@ -413,7 +499,6 @@ async def push_subscribe(req: PushSubscribeRequest) -> dict:
     log.info("Push subscription registered: %s → %s (%d watches)",
              req.device_id[:8], req.park, len(req.watches))
 
-    # Send a welcome push to new devices so they can confirm notifications work.
     if is_new:
         asyncio.create_task(_welcome_push(req.device_id))
 
